@@ -70,32 +70,12 @@ fn get_max_new<'py>(
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
 
     for col in 0..num_cols {
-        let mut max_deque: VecDeque<usize> = VecDeque::new();
+        let mut max_deque: VecDeque<usize> = VecDeque::with_capacity(length);
         let mut observation_count: usize = 0;
-        for row in 0..length {
-            let current: f32 = array[[row, col]];
-            if !current.is_nan() {
-                observation_count += 1;
-                while let Some(&back_idx) = max_deque.back() {
-                    if array[[back_idx, col]] < current {
-                        max_deque.pop_back();
-                    } else {
-                        break;
-                    }
-                }
-                max_deque.push_back(row);
-            }
-
-            if row + 1 >= length && observation_count >= min_length {
-                if let Some(&max_idx) = max_deque.front() {
-                    output[[row, col]] = array[[max_idx, col]];
-                }
-            }
-        }
-        for row in length..num_rows {
-            let current: f32 = array[[row, col]];
-            let prev_idx: usize = row - length;
-            let prev: f32 = array[[prev_idx, col]];
+        for row in 0..num_rows {
+            if row >= length {
+                let prev_idx: usize = row - length;
+                let prev: f32 = array[[prev_idx, col]];
                 if !prev.is_nan() {
                     observation_count -= 1;
                 }
@@ -104,6 +84,9 @@ fn get_max_new<'py>(
                         max_deque.pop_front();
                     }
                 }
+            }
+
+            let current: f32 = array[[row, col]];
             if !current.is_nan() {
                 observation_count += 1;
                 while let Some(&back_idx) = max_deque.back() {
@@ -125,6 +108,7 @@ fn get_max_new<'py>(
     }
     Ok(output.into_pyarray(py).into())
 }
+
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
