@@ -18,9 +18,9 @@ fn get_max<'py>(
 
     for col in 0..num_cols {
         let mut max_deque: VecDeque<usize> = VecDeque::new();
-        let mut observation_count = 0;
-        let mut current_max = f32::NEG_INFINITY;
-        for row in 0..length.min(num_rows) {
+        let mut observation_count: usize = 0;
+        let mut current_max: f32 = f32::NEG_INFINITY;
+        for row in 0..length {
             let current: f32 = array[[row, col]];
             if !current.is_nan() {
                 observation_count += 1;
@@ -33,21 +33,19 @@ fn get_max<'py>(
             }
         }
 
-        for row in 0..num_rows {
-            if row >= length {
-                let prev_idx = row - length;
-                let prev = array[[prev_idx, col]];
-                if !prev.is_nan() {
-                    observation_count -= 1;
-                }
-                if let Some(&front_idx) = max_deque.front() {
-                    if front_idx == prev_idx {
-                        max_deque.pop_front();
-                    }
+        for row in length..num_rows {
+            let prev_idx: usize = row - length;
+            let prev: f32 = array[[prev_idx, col]];
+            if !prev.is_nan() {
+                observation_count -= 1;
+            }
+            if let Some(&front_idx) = max_deque.front() {
+                if front_idx == prev_idx {
+                    max_deque.pop_front();
                 }
             }
 
-            let current = array[[row, col]];
+            let current: f32 = array[[row, col]];
             if !current.is_nan() {
                 observation_count += 1;
                 while let Some(&back_idx) = max_deque.back() {
@@ -60,7 +58,7 @@ fn get_max<'py>(
                 max_deque.push_back(row);
             }
 
-            if row + 1 >= length && observation_count >= min_length {
+            if observation_count >= min_length {
                 if let Some(&max_idx) = max_deque.front() {
                     output[[row, col]] = array[[max_idx, col]];
                 }
