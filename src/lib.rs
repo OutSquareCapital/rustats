@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use numpy::ndarray::{ Array2 };
 use std::collections::VecDeque;
 
+//TODO: fix the fact that the first value is incorrect
 #[pyfunction]
 fn get_max<'py>(
     py: Python<'py>,
@@ -19,29 +20,17 @@ fn get_max<'py>(
     for col in 0..num_cols {
         let mut max_deque: VecDeque<usize> = VecDeque::new();
         let mut observation_count: usize = 0;
-        let mut current_max: f32 = f32::NEG_INFINITY;
-        for row in 0..length {
-            let current: f32 = array[[row, col]];
-            if !current.is_nan() {
-                observation_count += 1;
-                if current > current_max {
-                    current_max = current;
+        for row in 0..num_rows {
+            if row >= length {
+                let prev_idx: usize = row - length;
+                let prev: f32 = array[[prev_idx, col]];
+                if !prev.is_nan() {
+                    observation_count -= 1;
                 }
-            }
-            if observation_count >= min_length {
-                output[[row, col]] = current_max;
-            }
-        }
-
-        for row in length..num_rows {
-            let prev_idx: usize = row - length;
-            let prev: f32 = array[[prev_idx, col]];
-            if !prev.is_nan() {
-                observation_count -= 1;
-            }
-            if let Some(&front_idx) = max_deque.front() {
-                if front_idx == prev_idx {
-                    max_deque.pop_front();
+                if let Some(&front_idx) = max_deque.front() {
+                    if front_idx == prev_idx {
+                        max_deque.pop_front();
+                    }
                 }
             }
 
@@ -58,7 +47,7 @@ fn get_max<'py>(
                 max_deque.push_back(row);
             }
 
-            if observation_count >= min_length {
+            if row + 1 >= length && observation_count >= min_length {
                 if let Some(&max_idx) = max_deque.front() {
                     output[[row, col]] = array[[max_idx, col]];
                 }
