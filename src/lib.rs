@@ -12,80 +12,77 @@ fn get_max_old<'py>(
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
-    let shape = array.shape();
-    let num_rows = shape[0];
-    let num_cols = shape[1];
+    let shape: &[usize] = array.shape();
+    let num_rows: usize = shape[0];
+    let num_cols: usize = shape[1];
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
 
-    let input_columns: Vec<_> = (0..num_cols)
-        .map(|i| array.column(i).to_owned())
-        .collect();
+    let input_columns: Vec<_> = (0..num_cols).map(|i| array.column(i).to_owned()).collect();
 
-    let mut output_columns: Vec<_> = output
-        .columns_mut()
-        .into_iter()
-        .collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    input_columns
-        .into_par_iter()
-        .zip(output_columns.par_iter_mut())
-        .for_each(|(input_col, output_col)| {
-            let mut max_deque = VecDeque::with_capacity(length);
-            let mut observation_count = 0;
+    py.allow_threads(|| {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut max_deque = VecDeque::with_capacity(length);
+                let mut observation_count: usize = 0;
 
-            for row in 0..length {
-                let current = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    while let Some(&(val, _)) = max_deque.back() {
-                        if val < current {
-                            max_deque.pop_back();
-                        } else {
-                            break;
+                for row in 0..length {
+                    let current = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        while let Some(&(val, _)) = max_deque.back() {
+                            if val < current {
+                                max_deque.pop_back();
+                            } else {
+                                break;
+                            }
                         }
+                        max_deque.push_back((current, row));
                     }
-                    max_deque.push_back((current, row));
-                }
 
-                if row + 1 == length && observation_count >= min_length {
-                    if let Some(&(val, _)) = max_deque.front() {
-                        output_col[row] = val;
-                    }
-                }
-            }
-
-            for row in length..num_rows {
-                let out_idx = row - length;
-                let old = input_col[out_idx];
-                if !old.is_nan() {
-                    observation_count -= 1;
-                    if let Some(&(_, pos)) = max_deque.front() {
-                        if pos == out_idx {
-                            max_deque.pop_front();
+                    if row + 1 == length && observation_count >= min_length {
+                        if let Some(&(val, _)) = max_deque.front() {
+                            output_col[row] = val;
                         }
                     }
                 }
 
-                let current = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    while let Some(&(val, _)) = max_deque.back() {
-                        if val < current {
-                            max_deque.pop_back();
-                        } else {
-                            break;
+                for row in length..num_rows {
+                    let out_idx: usize = row - length;
+                    let old = input_col[out_idx];
+                    if !old.is_nan() {
+                        observation_count -= 1;
+                        if let Some(&(_, pos)) = max_deque.front() {
+                            if pos == out_idx {
+                                max_deque.pop_front();
+                            }
                         }
                     }
-                    max_deque.push_back((current, row));
-                }
 
-                if observation_count >= min_length {
-                    if let Some(&(val, _)) = max_deque.front() {
-                        output_col[row] = val;
+                    let current = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        while let Some(&(val, _)) = max_deque.back() {
+                            if val < current {
+                                max_deque.pop_back();
+                            } else {
+                                break;
+                            }
+                        }
+                        max_deque.push_back((current, row));
+                    }
+
+                    if observation_count >= min_length {
+                        if let Some(&(val, _)) = max_deque.front() {
+                            output_col[row] = val;
+                        }
                     }
                 }
-            }
-        });
+            });
+    });
 
     Ok(PyArray2::from_owned_array(py, output).into())
 }
@@ -98,81 +95,53 @@ fn get_max_new<'py>(
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
-    let shape = array.shape();
-    let num_rows = shape[0];
-    let num_cols = shape[1];
+    let shape: &[usize] = array.shape();
+    let num_rows: usize = shape[0];
+    let num_cols: usize = shape[1];
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    let input_columns: Vec<_> = (0..num_cols)
-        .map(|i| array.column(i).to_owned())
-        .collect();
-
-    let mut output_columns: Vec<_> = output
-        .columns_mut()
-        .into_iter()
-        .collect();
-
-    py.allow_threads( | |{
+    py.allow_threads(move || {
         input_columns
-        .into_par_iter()
-        .zip(output_columns.par_iter_mut())
-        .for_each(|(input_col, output_col)| {
-            let mut max_deque = VecDeque::with_capacity(length);
-            let mut observation_count = 0;
-
-            for row in 0..length {
-                let current = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    while let Some(&(val, _)) = max_deque.back() {
-                        if val < current {
-                            max_deque.pop_back();
-                        } else {
-                            break;
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut max_deque = VecDeque::with_capacity(length);
+                let mut observation_count: usize = 0;
+                for row in 0..num_rows {
+                    if row >= length {
+                        let out_idx = row - length;
+                        if !input_col[out_idx].is_nan() {
+                            observation_count -= 1;
+                            if let Some(&(_, pos)) = max_deque.front() {
+                                if pos == out_idx {
+                                    max_deque.pop_front();
+                                }
+                            }
                         }
                     }
-                    max_deque.push_back((current, row));
-                }
-
-                if row + 1 == length && observation_count >= min_length {
-                    if let Some(&(val, _)) = max_deque.front() {
-                        output_col[row] = val;
+                    let current = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        while let Some(&(val, _)) = max_deque.back() {
+                            if val < current {
+                                max_deque.pop_back();
+                            } else {
+                                break;
+                            }
+                        }
+                        max_deque.push_back((current, row));
                     }
-                }
-            }
-
-            for row in length..num_rows {
-                let out_idx = row - length;
-                let old = input_col[out_idx];
-                if !old.is_nan() {
-                    observation_count -= 1;
-                    if let Some(&(_, pos)) = max_deque.front() {
-                        if pos == out_idx {
-                            max_deque.pop_front();
+                    if row >= length - 1 {
+                        if observation_count >= min_length {
+                            if let Some(&(val, _)) = max_deque.front() {
+                                output_col[row] = val;
+                            }
                         }
                     }
                 }
-
-                let current = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    while let Some(&(val, _)) = max_deque.back() {
-                        if val < current {
-                            max_deque.pop_back();
-                        } else {
-                            break;
-                        }
-                    }
-                    max_deque.push_back((current, row));
-                }
-
-                if observation_count >= min_length {
-                    if let Some(&(val, _)) = max_deque.front() {
-                        output_col[row] = val;
-                    }
-                }
-            }
-        });
+            });
     });
 
     Ok(PyArray2::from_owned_array(py, output).into())
