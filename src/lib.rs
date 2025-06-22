@@ -1,11 +1,11 @@
 use numpy::{ PyArray2, PyReadonlyArray2 };
 use pyo3::prelude::*;
-use numpy::ndarray::{ Array2, Axis };
+use numpy::ndarray::Array2;
 use std::collections::VecDeque;
 use rayon::prelude::*;
 
 #[pyfunction]
-fn get_max_old<'py>(
+fn move_max<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -65,7 +65,7 @@ fn get_max_old<'py>(
 }
 
 #[pyfunction]
-fn get_max_new<'py>(
+fn move_min<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -76,54 +76,57 @@ fn get_max_new<'py>(
     let num_rows: usize = shape[0];
     let num_cols: usize = shape[1];
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let output = py.allow_threads(move || {
-        output
-            .axis_iter_mut(Axis(1))
-            .zip(array.axis_iter(Axis(1)))
-            .for_each(|(mut output_col, input_col)| {
-                let mut max_deque = VecDeque::with_capacity(length);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut min_deque = VecDeque::with_capacity(length);
                 let mut observation_count: usize = 0;
                 for row in 0..num_rows {
                     if row >= length {
-                        let out_idx: usize = row - length;
+                        let out_idx = row - length;
                         if !input_col[out_idx].is_nan() {
                             observation_count -= 1;
-                            if let Some(&(_, pos)) = max_deque.front() {
+                            if let Some(&(_, pos)) = min_deque.front() {
                                 if pos == out_idx {
-                                    max_deque.pop_front();
+                                    min_deque.pop_front();
                                 }
                             }
                         }
                     }
-                    let current: f32 = input_col[row];
+                    let current = input_col[row];
                     if !current.is_nan() {
                         observation_count += 1;
-                        while let Some(&(val, _)) = max_deque.back() {
-                            if val < current {
-                                max_deque.pop_back();
+                        while let Some(&(val, _)) = min_deque.back() {
+                            if val > current {
+                                min_deque.pop_back();
                             } else {
                                 break;
                             }
                         }
-                        max_deque.push_back((current, row));
+                        min_deque.push_back((current, row));
                     }
                     if row >= length - 1 {
                         if observation_count >= min_length {
-                            if let Some(&(val, _)) = max_deque.front() {
+                            if let Some(&(val, _)) = min_deque.front() {
                                 output_col[row] = val;
                             }
                         }
                     }
                 }
             });
-        output
     });
 
     Ok(PyArray2::from_owned_array(py, output).into())
 }
+
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(get_max_old, module)?)?;
-    module.add_function(wrap_pyfunction!(get_max_new, module)?)?;
+    module.add_function(wrap_pyfunction!(move_max, module)?)?;
+    module.add_function(wrap_pyfunction!(move_min, module)?)?;
     Ok(())
 }
