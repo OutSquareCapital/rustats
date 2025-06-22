@@ -17,7 +17,7 @@ fn get_max_old<'py>(
     let num_cols: usize = shape[1];
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
 
-    for col in 0..num_cols {
+    py.allow_threads(|| for col in 0..num_cols {
         let mut max_deque: VecDeque<(f32, usize)> = VecDeque::with_capacity(length);
         let mut observation_count: usize = 0;
         for row in 0..num_rows {
@@ -52,7 +52,7 @@ fn get_max_old<'py>(
                 }
             }
         }
-    }
+    });
     Ok(output.into_pyarray(py).into())
 }
 
@@ -76,7 +76,8 @@ fn get_max_new<'py>(
         for row in 0..num_rows {
             if row >= length {
                 let prev_idx: usize = row - length;
-                let prev: f32 = array[[prev_idx, col]];
+                // SAFETY: The loop logic ensures prev_idx is always in bounds.
+                let prev: f32 = unsafe { *array.uget((prev_idx, col)) };
                 if !prev.is_nan() {
                     observation_count -= 1;
                 }
@@ -86,7 +87,8 @@ fn get_max_new<'py>(
                     }
                 }
             }
-            let current: f32 = array[[row, col]];
+            // SAFETY: The loop logic ensures row and col are always in bounds.
+            let current: f32 = unsafe { *array.uget((row, col)) };
             if !current.is_nan() {
                 observation_count += 1;
                 while let Some(&(back_val, _)) = max_deque.back() {
@@ -101,7 +103,8 @@ fn get_max_new<'py>(
 
             if row + 1 >= length && observation_count >= min_length {
                 if let Some(&(max_val, _)) = max_deque.front() {
-                    output[[row, col]] = max_val;
+                    // SAFETY: The loop logic ensures row and col are always in bounds.
+                    unsafe { *output.uget_mut((row, col)) = max_val };
                 }
             }
         }
