@@ -1,11 +1,12 @@
 import numpy as np
-from numpy.typing import NDArray
 
-def move_max(array: NDArray[np.float32], length: int, min_length: int) -> NDArray[np.float32]:
+type Array2D = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+
+def move_max(array: Array2D, length: int, min_length: int) -> Array2D:
     ...
-def move_min(array: NDArray[np.float32], length: int, min_length: int) -> NDArray[np.float32]:
+def move_min(array: Array2D, length: int, min_length: int) -> Array2D:
     ...
-def move_median(array: NDArray[np.float32], length: int, min_length: int) -> NDArray[np.float32]:
+def move_median(array: Array2D, length: int, min_length: int) -> Array2D:
     ...
-def move_median_old(array: NDArray[np.float32], length: int, min_length: int) -> NDArray[np.float32]:
+def move_median_old(array: Array2D, length: int, min_length: int) -> Array2D:
     ...

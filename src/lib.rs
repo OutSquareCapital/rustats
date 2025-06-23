@@ -392,13 +392,14 @@ fn move_median<'py>(
                             }
                         }
                     }
-                    while small_heap.len() > large_heap.len() + 1 {
+
+                    let imbalance: isize =
+                        (small_heap.len() as isize) - (large_heap.len() as isize);
+                    if imbalance > 1 {
                         if let Some((val, idx)) = small_heap.pop() {
                             large_heap.push(val, idx);
                         }
-                    }
-
-                    while large_heap.len() > small_heap.len() {
+                    } else if imbalance < 0 {
                         if let Some((val, idx)) = large_heap.pop() {
                             small_heap.push(val, idx);
                         }
