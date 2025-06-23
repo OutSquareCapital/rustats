@@ -57,3 +57,14 @@ pub fn kurtosis(
         ((obs - 2.0) * (obs - 3.0));
     kurt
 }
+
+#[inline(always)]
+pub fn rank(greater_count: f32, equal_count: f32, valid_count: f32) -> f32 {
+    if valid_count == 1.0 {
+        0.0
+    } else {
+        let raw_rank: f32 = 0.5 * (greater_count + equal_count - 1.0);
+        let normalized_rank: f32 = 2.0 * (raw_rank / (valid_count - 1.0) - 0.5);
+        normalized_rank
+    }
+}

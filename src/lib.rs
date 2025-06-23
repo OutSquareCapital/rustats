@@ -4,7 +4,7 @@ use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
 use rayon::prelude::*;
 mod stats;
-mod classes;
+mod heaps;
 mod calculators;
 mod templates;
 
@@ -89,122 +89,6 @@ fn move_kurtosis_parallel<'py>(
 }
 
 #[pyfunction]
-fn move_max_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut max_deque = VecDeque::with_capacity(length);
-                let mut observation_count: usize = 0;
-                for row in 0..num_rows {
-                    if row >= length {
-                        let out_idx = row - length;
-                        if !input_col[out_idx].is_nan() {
-                            observation_count -= 1;
-                            if let Some(&(_, pos)) = max_deque.front() {
-                                if pos == out_idx {
-                                    max_deque.pop_front();
-                                }
-                            }
-                        }
-                    }
-                    let current = input_col[row];
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        while let Some(&(val, _)) = max_deque.back() {
-                            if val < current {
-                                max_deque.pop_back();
-                            } else {
-                                break;
-                            }
-                        }
-                        max_deque.push_back((current, row));
-                    }
-                    if row >= length - 1 {
-                        if observation_count >= min_length {
-                            if let Some(&(val, _)) = max_deque.front() {
-                                output_col[row] = val;
-                            }
-                        }
-                    }
-                }
-            });
-    });
-
-    Ok(PyArray2::from_owned_array(py, output).into())
-}
-
-#[pyfunction]
-fn move_min_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut min_deque = VecDeque::with_capacity(length);
-                let mut observation_count: usize = 0;
-                for row in 0..num_rows {
-                    if row >= length {
-                        let out_idx = row - length;
-                        if !input_col[out_idx].is_nan() {
-                            observation_count -= 1;
-                            if let Some(&(_, pos)) = min_deque.front() {
-                                if pos == out_idx {
-                                    min_deque.pop_front();
-                                }
-                            }
-                        }
-                    }
-                    let current = input_col[row];
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        while let Some(&(val, _)) = min_deque.back() {
-                            if val > current {
-                                min_deque.pop_back();
-                            } else {
-                                break;
-                            }
-                        }
-                        min_deque.push_back((current, row));
-                    }
-                    if row >= length - 1 {
-                        if observation_count >= min_length {
-                            if let Some(&(val, _)) = min_deque.front() {
-                                output_col[row] = val;
-                            }
-                        }
-                    }
-                }
-            });
-    });
-
-    Ok(PyArray2::from_owned_array(py, output).into())
-}
-
-#[pyfunction]
 fn move_min<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
@@ -242,8 +126,8 @@ fn move_median<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut small_heap = classes::IndexedHeap::new(length, num_rows, true);
-                let mut large_heap = classes::IndexedHeap::new(length, num_rows, false);
+                let mut small_heap = heaps::Indexed::new(length, num_rows, true);
+                let mut large_heap = heaps::Indexed::new(length, num_rows, false);
                 let mut window_q: VecDeque<(f32, usize)> = VecDeque::with_capacity(length + 1);
                 let mut valid_count: usize = 0;
 
@@ -307,6 +191,79 @@ fn move_median<'py>(
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
+#[pyfunction]
+fn move_rank<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                for row in min_length..length {
+                    let current: f32 = input_col[row];
+                    if current.is_nan() {
+                        continue;
+                    }
+                    let mut greater_count: f32 = 0.0;
+                    let mut equal_count: f32 = 1.0;
+                    let mut valid_count: f32 = 1.0;
+                    for j in 0..row {
+                        let other: f32 = input_col[j];
+                        if !other.is_nan() {
+                            valid_count += 1.0;
+                            if current > other {
+                                greater_count += 2.0;
+                            } else if current == other {
+                                equal_count += 1.0;
+                            }
+                        }
+                    }
+
+                    if valid_count >= (min_length as f32) {
+                        output_col[row] = stats::rank(greater_count, equal_count, valid_count);
+                    }
+                }
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    if current.is_nan() {
+                        continue;
+                    }
+                    let mut greater_count: f32 = 0.0;
+                    let mut equal_count: f32 = 1.0;
+                    let mut valid_count: f32 = 1.0;
+                    let start_idx: usize = row - length + 1;
+                    for j in start_idx..row {
+                        let other: f32 = input_col[j];
+                        if !other.is_nan() {
+                            valid_count += 1.0;
+                            if current > other {
+                                greater_count += 2.0;
+                            } else if current == other {
+                                equal_count += 1.0;
+                            }
+                        }
+                    }
+
+                    if valid_count >= (min_length as f32) {
+                        output_col[row] = stats::rank(greater_count, equal_count, valid_count);
+                    }
+                }
+            });
+    });
+
+    Ok(PyArray2::from_owned_array(py, output).into())
+}
+
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
@@ -315,12 +272,11 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
-    module.add_function(wrap_pyfunction!(move_max_old, module)?)?;
-    module.add_function(wrap_pyfunction!(move_min_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis_parallel, module)?)?;
+    module.add_function(wrap_pyfunction!(move_rank, module)?)?;
     Ok(())
 }
