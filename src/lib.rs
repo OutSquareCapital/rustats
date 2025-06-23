@@ -7,7 +7,7 @@ mod stats;
 mod classes;
 mod calculators;
 
-fn calculate_moving_statistic<Calculator: calculators::StatCalculator>(
+fn move_template_parallel<Calculator: calculators::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
     length: usize,
@@ -64,6 +64,60 @@ fn calculate_moving_statistic<Calculator: calculators::StatCalculator>(
     Ok(output.into_pyarray(py).into())
 }
 
+fn move_template_single<Calculator: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
+            let mut state = Calculator::new_state();
+            let mut observation_count: usize = 0;
+
+            for row in 0..length {
+                let current: f64 = input_col[row] as f64;
+                if !current.is_nan() {
+                    observation_count += 1;
+                    Calculator::add_value(&mut state, current);
+                }
+
+                if observation_count >= min_length {
+                    output_col[row] = Calculator::calculate(&state, observation_count);
+                }
+            }
+
+            for row in length..num_rows {
+                let current: f64 = input_col[row] as f64;
+                let precedent_idx: usize = row - length;
+                let precedent: f64 = input_col[precedent_idx] as f64;
+
+                if !current.is_nan() {
+                    observation_count += 1;
+                    Calculator::add_value(&mut state, current);
+                }
+
+                if !precedent.is_nan() {
+                    observation_count -= 1;
+                    Calculator::remove_value(&mut state, precedent);
+                }
+
+                if observation_count >= min_length {
+                    output_col[row] = Calculator::calculate(&state, observation_count);
+                }
+            }
+        }
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
 #[pyfunction]
 fn move_sum<'py>(
     py: Python<'py>,
@@ -71,7 +125,7 @@ fn move_sum<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Sum>(py, array, length, min_length)
+    move_template_parallel::<calculators::Sum>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -81,7 +135,7 @@ fn move_mean<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Mean>(py, array, length, min_length)
+    move_template_parallel::<calculators::Mean>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -91,7 +145,7 @@ fn move_var<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Var>(py, array, length, min_length)
+    move_template_parallel::<calculators::Var>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -101,7 +155,17 @@ fn move_std<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Stdev>(py, array, length, min_length)
+    move_template_parallel::<calculators::Stdev>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_skewness<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    move_template_single::<calculators::Skewness>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -111,7 +175,17 @@ fn move_skewness_parallel<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Skewness>(py, array, length, min_length)
+    move_template_parallel::<calculators::Skewness>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_kurtosis<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    move_template_single::<calculators::Kurtosis>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -121,11 +195,11 @@ fn move_kurtosis_parallel<'py>(
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
-    calculate_moving_statistic::<calculators::Kurtosis>(py, array, length, min_length)
+    move_template_parallel::<calculators::Kurtosis>(py, array, length, min_length)
 }
 
 #[pyfunction]
-fn move_skewness<'py>(
+fn move_skewness_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -202,7 +276,7 @@ fn move_skewness<'py>(
 }
 
 #[pyfunction]
-fn move_kurtosis<'py>(
+fn move_kurtosis_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -289,322 +363,6 @@ fn move_kurtosis<'py>(
                 }
             }
         }
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_skewness_parallel_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f64 = 0.0;
-                let mut variance_sum: f64 = 0.0;
-                let mut skew_sum: f64 = 0.0;
-                let mut skew_compensation: f64 = 0.0;
-                let mut observation_count: usize = 0;
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        variance_sum += current.powi(2);
-                        let temp: f64 = current.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                    }
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_skew(
-                            mean_sum,
-                            variance_sum,
-                            skew_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-                for row in length..num_rows {
-                    let current: f64 = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent: f64 = input_col[precedent_idx] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        variance_sum += current.powi(2);
-                        let temp: f64 = current.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                    }
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= precedent;
-                        variance_sum -= precedent.powi(2);
-                        let temp: f64 = -precedent.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                    }
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_skew(
-                            mean_sum,
-                            variance_sum,
-                            skew_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-            });
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_kurtosis_parallel_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f64 = 0.0;
-                let mut variance_sum: f64 = 0.0;
-                let mut skew_sum: f64 = 0.0;
-                let mut skew_compensation: f64 = 0.0;
-                let mut quartic_sum: f64 = 0.0;
-                let mut quartic_compensation: f64 = 0.0;
-                let mut observation_count: usize = 0;
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        variance_sum += current.powi(2);
-                        let temp: f64 = current.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                        let temp: f64 = current.powi(4) - quartic_compensation;
-                        let total: f64 = quartic_sum + temp;
-                        quartic_compensation = total - quartic_sum - temp;
-                        quartic_sum = total;
-                    }
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_kurtosis(
-                            mean_sum,
-                            variance_sum,
-                            skew_sum,
-                            quartic_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-                for row in length..num_rows {
-                    let current: f64 = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent: f64 = input_col[precedent_idx] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        variance_sum += current.powi(2);
-                        let temp: f64 = current.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                        let temp: f64 = current.powi(4) - quartic_compensation;
-                        let total: f64 = quartic_sum + temp;
-                        quartic_compensation = total - quartic_sum - temp;
-                        quartic_sum = total;
-                    }
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= precedent;
-                        variance_sum -= precedent.powi(2);
-                        let temp: f64 = -precedent.powi(3) - skew_compensation;
-                        let total: f64 = skew_sum + temp;
-                        skew_compensation = total - skew_sum - temp;
-                        skew_sum = total;
-                        let temp: f64 = -precedent.powi(4) - quartic_compensation;
-                        let total: f64 = quartic_sum + temp;
-                        quartic_compensation = total - quartic_sum - temp;
-                        quartic_sum = total;
-                    }
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_kurtosis(
-                            mean_sum,
-                            variance_sum,
-                            skew_sum,
-                            quartic_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-            });
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_var_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f64 = 0.0;
-                let mut mean_square_sum: f64 = 0.0;
-                let mut observation_count: usize = 0;
-
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        mean_square_sum += current * current;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_var(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-
-                for row in length..num_rows {
-                    let current: f64 = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent: f64 = input_col[precedent_idx] as f64;
-
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        mean_square_sum += current * current;
-                    }
-
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= precedent;
-                        mean_square_sum -= precedent * precedent;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_var(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-            });
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_std_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f64 = 0.0;
-                let mut mean_square_sum: f64 = 0.0;
-                let mut observation_count: usize = 0;
-
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        mean_square_sum += current * current;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_std(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-
-                for row in length..num_rows {
-                    let current: f64 = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent: f64 = input_col[precedent_idx] as f64;
-
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        mean_square_sum += current * current;
-                    }
-
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= precedent;
-                        mean_square_sum -= precedent * precedent;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_std(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ) as f32;
-                    }
-                }
-            });
     });
 
     Ok(output.into_pyarray(py).into())
@@ -811,10 +569,6 @@ fn move_median<'py>(
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(move_kurtosis_parallel_old, module)?)?;
-    module.add_function(wrap_pyfunction!(move_skewness_parallel_old, module)?)?;
-    module.add_function(wrap_pyfunction!(move_std_old, module)?)?;
-    module.add_function(wrap_pyfunction!(move_var_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
     module.add_function(wrap_pyfunction!(move_std, module)?)?;
     module.add_function(wrap_pyfunction!(move_var, module)?)?;
@@ -823,8 +577,10 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
+    module.add_function(wrap_pyfunction!(move_skewness_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
+    module.add_function(wrap_pyfunction!(move_kurtosis_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis_parallel, module)?)?;
     Ok(())
 }

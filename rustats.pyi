@@ -45,3 +45,9 @@ def move_kurtosis(
 def move_kurtosis_parallel(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...
+def move_skewness_old(
+    array: NDArray[np.float32], length: int, min_length: int
+) -> NDArray[np.float32]: ...
+def move_kurtosis_old(
+    array: NDArray[np.float32], length: int, min_length: int
+) -> NDArray[np.float32]: ...
