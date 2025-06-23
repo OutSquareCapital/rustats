@@ -21,7 +21,7 @@ fn move_mean<'py>(
         for col in 0..num_cols {
             let mut mean_sum: f32 = 0.0;
             let mut observation_count: usize = 0;
-            for row in 0..num_rows {
+            for row in 0..length {
                 let current: f32 = array[[row, col]];
                 if !current.is_nan() {
                     observation_count += 1;
