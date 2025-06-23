@@ -5,8 +5,14 @@ use std::collections::{ VecDeque };
 use rayon::prelude::*;
 
 #[inline(always)]
-fn get_var(mean_sum: f32, mean_square_sum: f32, observation_count: usize) -> f32 {
-    mean_square_sum / (observation_count as f32) - (mean_sum / (observation_count as f32)).powi(2)
+fn get_var(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f32 {
+    (mean_square_sum / (observation_count as f64) -
+        (mean_sum / (observation_count as f64)).powi(2)) as f32
+}
+
+#[inline(always)]
+fn get_std(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f32 {
+    get_var(mean_sum, mean_square_sum, observation_count).sqrt()
 }
 
 #[pyfunction]
@@ -143,12 +149,12 @@ fn move_var<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f32 = 0.0;
-                let mut mean_square_sum: f32 = 0.0;
+                let mut mean_sum: f64 = 0.0;
+                let mut mean_square_sum: f64 = 0.0;
                 let mut observation_count: usize = 0;
 
                 for row in 0..length {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     if !current.is_nan() {
                         observation_count += 1;
                         mean_sum += current;
@@ -161,9 +167,9 @@ fn move_var<'py>(
                 }
 
                 for row in length..num_rows {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     let precedent_idx: usize = row - length;
-                    let precedent: f32 = input_col[precedent_idx];
+                    let precedent: f64 = input_col[precedent_idx] as f64;
 
                     if !current.is_nan() {
                         observation_count += 1;
@@ -205,12 +211,12 @@ fn move_std<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f32 = 0.0;
-                let mut mean_square_sum: f32 = 0.0;
+                let mut mean_sum: f64 = 0.0;
+                let mut mean_square_sum: f64 = 0.0;
                 let mut observation_count: usize = 0;
 
                 for row in 0..length {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     if !current.is_nan() {
                         observation_count += 1;
                         mean_sum += current;
@@ -218,18 +224,14 @@ fn move_std<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_var(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ).sqrt();
+                        output_col[row] = get_std(mean_sum, mean_square_sum, observation_count);
                     }
                 }
 
                 for row in length..num_rows {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     let precedent_idx: usize = row - length;
-                    let precedent: f32 = input_col[precedent_idx];
+                    let precedent: f64 = input_col[precedent_idx] as f64;
 
                     if !current.is_nan() {
                         observation_count += 1;
@@ -244,11 +246,7 @@ fn move_std<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_var(
-                            mean_sum,
-                            mean_square_sum,
-                            observation_count
-                        ).sqrt();
+                        output_col[row] = get_std(mean_sum, mean_square_sum, observation_count);
                     }
                 }
             });
