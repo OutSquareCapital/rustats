@@ -4,6 +4,11 @@ use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
 use rayon::prelude::*;
 
+#[inline(always)]
+fn get_var(mean_sum: f32, mean_square_sum: f32, observation_count: usize) -> f32 {
+    mean_square_sum / (observation_count as f32) - (mean_sum / (observation_count as f32)).powi(2)
+}
+
 #[pyfunction]
 fn move_sum<'py>(
     py: Python<'py>,
@@ -17,46 +22,46 @@ fn move_sum<'py>(
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    py.allow_threads(move ||{
+    py.allow_threads(move || {
         input_columns
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-            let mut sum: f32 = 0.0;
-            let mut observation_count: usize = 0;
+                let mut sum: f32 = 0.0;
+                let mut observation_count: usize = 0;
 
-            for row in 0..length {
-                let current: f32 = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    sum += current;
+                for row in 0..length {
+                    let current: f32 = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        sum += current;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = sum;
+                    }
                 }
 
-                if observation_count >= min_length {
-                    output_col[row] = sum;
-                }
-            }
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    let precedent_idx: usize = row - length;
+                    let precedent: f32 = input_col[precedent_idx];
 
-            for row in length..num_rows {
-                let current: f32 = input_col[row];
-                let precedent_idx: usize = row - length;
-                let precedent: f32 = input_col[precedent_idx];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        sum += current;
+                    }
 
-                if !current.is_nan() {
-                    observation_count += 1;
-                    sum += current;
-                }
+                    if !precedent.is_nan() {
+                        observation_count -= 1;
+                        sum -= precedent;
+                    }
 
-                if !precedent.is_nan() {
-                    observation_count -= 1;
-                    sum -= precedent;
+                    if observation_count >= min_length {
+                        output_col[row] = sum;
+                    }
                 }
-
-                if observation_count >= min_length {
-                    output_col[row] = sum;
-                }
-            }
-        });
+            });
     });
 
     Ok(output.into_pyarray(py).into())
@@ -75,46 +80,174 @@ fn move_mean<'py>(
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    py.allow_threads(move ||{
+    py.allow_threads(move || {
         input_columns
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-            let mut mean_sum: f32 = 0.0;
-            let mut observation_count: usize = 0;
+                let mut mean_sum: f32 = 0.0;
+                let mut observation_count: usize = 0;
 
-            for row in 0..length {
-                let current: f32 = input_col[row];
-                if !current.is_nan() {
-                    observation_count += 1;
-                    mean_sum += current;
+                for row in 0..length {
+                    let current: f32 = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = mean_sum / (observation_count as f32);
+                    }
                 }
 
-                if observation_count >= min_length {
-                    output_col[row] = mean_sum / (observation_count as f32);
-                }
-            }
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    let precedent_idx: usize = row - length;
+                    let precedent: f32 = input_col[precedent_idx];
 
-            for row in length..num_rows {
-                let current: f32 = input_col[row];
-                let precedent_idx: usize = row - length;
-                let precedent: f32 = input_col[precedent_idx];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                    }
 
-                if !current.is_nan() {
-                    observation_count += 1;
-                    mean_sum += current;
+                    if !precedent.is_nan() {
+                        observation_count -= 1;
+                        mean_sum -= precedent;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = mean_sum / (observation_count as f32);
+                    }
+                }
+            });
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
+#[pyfunction]
+fn move_var<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut mean_sum: f32 = 0.0;
+                let mut mean_square_sum: f32 = 0.0;
+                let mut observation_count: usize = 0;
+
+                for row in 0..length {
+                    let current: f32 = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                        mean_square_sum += current * current;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = get_var(mean_sum, mean_square_sum, observation_count);
+                    }
                 }
 
-                if !precedent.is_nan() {
-                    observation_count -= 1;
-                    mean_sum -= precedent;
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    let precedent_idx: usize = row - length;
+                    let precedent: f32 = input_col[precedent_idx];
+
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                    }
+
+                    if !precedent.is_nan() {
+                        observation_count -= 1;
+                        mean_sum -= precedent;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = get_var(mean_sum, mean_square_sum, observation_count);
+                    }
+                }
+            });
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
+#[pyfunction]
+fn move_std<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut mean_sum: f32 = 0.0;
+                let mut mean_square_sum: f32 = 0.0;
+                let mut observation_count: usize = 0;
+
+                for row in 0..length {
+                    let current: f32 = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                        mean_square_sum += current * current;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = get_var(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ).sqrt();
+                    }
                 }
 
-                if observation_count >= min_length {
-                    output_col[row] = mean_sum / (observation_count as f32);
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    let precedent_idx: usize = row - length;
+                    let precedent: f32 = input_col[precedent_idx];
+
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        mean_sum += current;
+                    }
+
+                    if !precedent.is_nan() {
+                        observation_count -= 1;
+                        mean_sum -= precedent;
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = get_var(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ).sqrt();
+                    }
                 }
-            }
-        });
+            });
     });
 
     Ok(output.into_pyarray(py).into())
@@ -449,6 +582,8 @@ fn move_median<'py>(
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
+    module.add_function(wrap_pyfunction!(move_std, module)?)?;
+    module.add_function(wrap_pyfunction!(move_var, module)?)?;
     module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
