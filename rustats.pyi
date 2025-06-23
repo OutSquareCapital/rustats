@@ -1,17 +1,5 @@
 import numpy as np
 from numpy.typing import NDArray
-def move_std_old(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
-def move_var_old(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
-def move_kurtosis_parallel_old(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
-def move_skewness_parallel_old(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
 def move_sum(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...
@@ -43,11 +31,5 @@ def move_kurtosis(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...
 def move_kurtosis_parallel(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
-def move_skewness_old(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...
-def move_kurtosis_old(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...
