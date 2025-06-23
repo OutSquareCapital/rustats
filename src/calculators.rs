@@ -1,4 +1,5 @@
 use crate::stats;
+use std::collections::VecDeque;
 
 pub trait StatCalculator {
     type State;
@@ -7,6 +8,13 @@ pub trait StatCalculator {
     fn add_value(state: &mut Self::State, value: f64);
     fn remove_value(state: &mut Self::State, value: f64);
     fn get(state: &Self::State, count: usize) -> f32;
+}
+
+pub trait DequeStatCalculator {
+    fn new() -> VecDeque<(f32, usize)>;
+    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize);
+    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize);
+    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32;
 }
 pub struct Sum;
 impl StatCalculator for Sum {
@@ -152,3 +160,62 @@ impl StatCalculator for Kurtosis {
     }
 }
 
+pub struct Min;
+impl DequeStatCalculator for Min {
+    fn new() -> VecDeque<(f32, usize)> {
+        VecDeque::new()
+    }
+
+    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize) {
+        while let Some(&(val, _)) = deque.back() {
+            if val > value {
+                deque.pop_back();
+            } else {
+                break;
+            }
+        }
+        deque.push_back((value, idx));
+    }
+
+    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize) {
+        if let Some(&(_, front_idx)) = deque.front() {
+            if front_idx == idx {
+                deque.pop_front();
+            }
+        }
+    }
+
+    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32 {
+        if let Some(&(val, _)) = deque.front() { val } else { f32::NAN }
+    }
+}
+
+pub struct Max;
+impl DequeStatCalculator for Max {
+    fn new() -> VecDeque<(f32, usize)> {
+        VecDeque::new()
+    }
+
+    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize) {
+        while let Some(&(val, _)) = deque.back() {
+            if val < value {
+                deque.pop_back();
+            } else {
+                break;
+            }
+        }
+        deque.push_back((value, idx));
+    }
+
+    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize) {
+        if let Some(&(_, front_idx)) = deque.front() {
+            if front_idx == idx {
+                deque.pop_front();
+            }
+        }
+    }
+
+    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32 {
+        if let Some(&(val, _)) = deque.front() { val } else { f32::NAN }
+    }
+}

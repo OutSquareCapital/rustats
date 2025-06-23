@@ -89,7 +89,7 @@ fn move_kurtosis_parallel<'py>(
 }
 
 #[pyfunction]
-fn move_max<'py>(
+fn move_max_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -147,7 +147,7 @@ fn move_max<'py>(
 }
 
 #[pyfunction]
-fn move_min<'py>(
+fn move_min_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -202,6 +202,26 @@ fn move_min<'py>(
     });
 
     Ok(PyArray2::from_owned_array(py, output).into())
+}
+
+#[pyfunction]
+fn move_min<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    templates::move_deque_parallel::<calculators::Min>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_max<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    templates::move_deque_parallel::<calculators::Max>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -295,6 +315,8 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
+    module.add_function(wrap_pyfunction!(move_max_old, module)?)?;
+    module.add_function(wrap_pyfunction!(move_min_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness_parallel, module)?)?;

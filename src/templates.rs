@@ -104,12 +104,57 @@ pub fn move_single<Stat: calculators::StatCalculator>(
                     observation_count -= 1;
                     Stat::remove_value(&mut state, precedent);
                 }
-
                 if observation_count >= min_length {
                     output_col[row] = Stat::get(&state, observation_count);
                 }
             }
         }
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
+pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize,
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut deque = Stat::new();
+                let mut observation_count: usize = 0;
+
+                for row in 0..num_rows {
+                    if row >= length {
+                        let out_idx: usize = row - length;
+                        let out_val: f32 = input_col[out_idx];
+                        if !out_val.is_nan() {
+                            observation_count -= 1;
+                            Stat::remove_with_index(&mut deque, out_idx);
+                        }
+                    }
+
+                    let current: f32 = input_col[row];
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        Stat::add_with_index(&mut deque, current, row);
+                    }
+
+                    if row >= length - 1 && observation_count >= min_length {
+                        output_col[row] = Stat::get_result(&deque);
+                    }
+                }
+            });
     });
 
     Ok(output.into_pyarray(py).into())
