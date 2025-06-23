@@ -168,11 +168,13 @@ fn move_var<'py>(
                     if !current.is_nan() {
                         observation_count += 1;
                         mean_sum += current;
+                        mean_square_sum += current * current;
                     }
 
                     if !precedent.is_nan() {
                         observation_count -= 1;
                         mean_sum -= precedent;
+                        mean_square_sum -= precedent * precedent;
                     }
 
                     if observation_count >= min_length {
@@ -232,11 +234,13 @@ fn move_std<'py>(
                     if !current.is_nan() {
                         observation_count += 1;
                         mean_sum += current;
+                        mean_square_sum += current * current;
                     }
 
                     if !precedent.is_nan() {
                         observation_count -= 1;
                         mean_sum -= precedent;
+                        mean_square_sum -= precedent * precedent;
                     }
 
                     if observation_count >= min_length {
