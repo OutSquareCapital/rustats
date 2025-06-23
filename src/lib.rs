@@ -22,7 +22,7 @@ fn move_mean_old<'py>(
             let mut mean_sum: f32 = 0.0;
             let mut observation_count: usize = 0;
 
-            for row in 0..length.min(num_rows) {
+            for row in 0..length {
                 let current: f32 = input_col[row];
                 if !current.is_nan() {
                     observation_count += 1;
@@ -72,12 +72,16 @@ fn move_mean<'py>(
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    py.allow_threads(|| {
-        for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
+    py.allow_threads(move ||{
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
             let mut mean_sum: f32 = 0.0;
             let mut observation_count: usize = 0;
+
             for row in 0..length {
-                let current = input_col[row];
+                let current: f32 = input_col[row];
                 if !current.is_nan() {
                     observation_count += 1;
                     mean_sum += current;
@@ -88,56 +92,26 @@ fn move_mean<'py>(
                 }
             }
 
-            if observation_count >= min_length {
-                let mut count_inv: f32 = 1.0 / (observation_count as f32);
+            for row in length..num_rows {
+                let current: f32 = input_col[row];
+                let precedent_idx: usize = row - length;
+                let precedent: f32 = input_col[precedent_idx];
 
-                for row in length..num_rows {
-                    let current: f32 = input_col[row];
-                    let old_value: f32 = input_col[row - length];
-
-                    let mut count_changed: bool = false;
-
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                        count_changed = true;
-                    }
-
-                    if !old_value.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= old_value;
-                        count_changed = true;
-                    }
-
-                    if count_changed && observation_count > 0 {
-                        count_inv = 1.0 / (observation_count as f32);
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = mean_sum * count_inv;
-                    }
+                if !current.is_nan() {
+                    observation_count += 1;
+                    mean_sum += current;
                 }
-            } else {
-                for row in length..num_rows {
-                    let current: f32 = input_col[row];
-                    let old_value: f32 = input_col[row - length];
 
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                    }
+                if !precedent.is_nan() {
+                    observation_count -= 1;
+                    mean_sum -= precedent;
+                }
 
-                    if !old_value.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= old_value;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = mean_sum / (observation_count as f32);
-                    }
+                if observation_count >= min_length {
+                    output_col[row] = mean_sum / (observation_count as f32);
                 }
             }
-        }
+        });
     });
 
     Ok(output.into_pyarray(py).into())

@@ -263,7 +263,7 @@ dependencies = [
 
 [[package]]
 name = "rustats"
-version = "0.1.261"
+version = "0.1.262"
 dependencies = [
  "ndarray",
  "numpy",
