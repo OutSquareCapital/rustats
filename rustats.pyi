@@ -1,6 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
 
+def move_sum_test(
+    array: NDArray[np.float32], length: int, min_length: int
+) -> NDArray[np.float32]: ...
+def move_mean_test(
+    array: NDArray[np.float32], length: int, min_length: int
+) -> NDArray[np.float32]: ...
 def move_sum(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...

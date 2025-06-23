@@ -5,6 +5,84 @@ use std::collections::{ VecDeque };
 use rayon::prelude::*;
 mod stats;
 mod classes;
+mod calculators;
+
+fn calculate_moving_statistic<Calculator: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut state = Calculator::new_state();
+                let mut observation_count: usize = 0;
+
+                for row in 0..length {
+                    let current: f64 = input_col[row] as f64;
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        Calculator::add_value(&mut state, current);
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = Calculator::calculate(&state, observation_count);
+                    }
+                }
+
+                for row in length..num_rows {
+                    let current: f64 = input_col[row] as f64;
+                    let precedent_idx: usize = row - length;
+                    let precedent: f64 = input_col[precedent_idx] as f64;
+
+                    if !current.is_nan() {
+                        observation_count += 1;
+                        Calculator::add_value(&mut state, current);
+                    }
+
+                    if !precedent.is_nan() {
+                        observation_count -= 1;
+                        Calculator::remove_value(&mut state, precedent);
+                    }
+
+                    if observation_count >= min_length {
+                        output_col[row] = Calculator::calculate(&state, observation_count);
+                    }
+                }
+            });
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
+#[pyfunction]
+fn move_sum_test<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Sum>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_mean_test<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Mean>(py, array, length, min_length)
+}
 
 #[pyfunction]
 fn move_skewness<'py>(
@@ -809,6 +887,8 @@ fn move_median<'py>(
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(move_mean_test, module)?)?;
+    module.add_function(wrap_pyfunction!(move_sum_test, module)?)?;
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
     module.add_function(wrap_pyfunction!(move_std, module)?)?;
     module.add_function(wrap_pyfunction!(move_var, module)?)?;
