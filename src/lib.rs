@@ -3,7 +3,6 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
 use rayon::prelude::*;
-use std::arch::x86_64::*;
 
 #[pyfunction]
 fn move_max<'py>(
@@ -253,7 +252,7 @@ impl IndexedHeap {
 }
 
 #[pyfunction]
-fn move_median_old<'py>(
+fn move_median<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -337,119 +336,10 @@ fn move_median_old<'py>(
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
-#[pyfunction]
-fn move_median<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let shape: &[usize] = array.shape();
-    let num_rows: usize = shape[0];
-    let num_cols: usize = shape[1];
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-    #[cfg(target_arch = "x86_64")]
-    let use_simd: bool = is_x86_feature_detected!("sse2");
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut small_heap: IndexedHeap = IndexedHeap::new(length, num_rows, true);
-                let mut large_heap: IndexedHeap = IndexedHeap::new(length, num_rows, false);
-                let mut window_q: VecDeque<(f32, usize)> = VecDeque::with_capacity(length + 1);
-                let mut valid_count: usize = 0;
-
-                for row in 0..num_rows {
-                    let current_val: f32 = input_col[row];
-
-                    window_q.push_back((current_val, row));
-
-                    if !current_val.is_nan() {
-                        valid_count += 1;
-
-                        if let Some((max_small, _)) = small_heap.peek() {
-                            if current_val > max_small {
-                                large_heap.push(current_val, row);
-                            } else {
-                                small_heap.push(current_val, row);
-                            }
-                        } else {
-                            small_heap.push(current_val, row);
-                        }
-                    }
-
-                    if window_q.len() > length {
-                        let (old_val, old_idx) = window_q.pop_front().unwrap();
-
-                        if !old_val.is_nan() {
-                            valid_count -= 1;
-
-                            if small_heap.remove(old_idx) {
-                            } else {
-                                large_heap.remove(old_idx);
-                            }
-                        }
-                    }
-
-                    let imbalance: isize =
-                        (small_heap.len() as isize) - (large_heap.len() as isize);
-                    if imbalance > 1 {
-                        if let Some((val, idx)) = small_heap.pop() {
-                            large_heap.push(val, idx);
-                        }
-                    } else if imbalance < 0 {
-                        if let Some((val, idx)) = large_heap.pop() {
-                            small_heap.push(val, idx);
-                        }
-                    }
-
-                    if window_q.len() >= length && valid_count >= min_length {
-                        if small_heap.len() > large_heap.len() {
-                            if let Some((val, _)) = small_heap.peek() {
-                                output_col[row] = val;
-                            }
-                        } else if !small_heap.is_empty() {
-                            #[cfg(target_arch = "x86_64")]
-                            {
-                                if use_simd {
-                                    unsafe {
-                                        let s_val = _mm_set_ss(small_heap.peek().unwrap().0);
-                                        let l_val = _mm_set_ss(large_heap.peek().unwrap().0);
-                                        let sum = _mm_add_ss(s_val, l_val);
-                                        let half = _mm_set_ss(0.5);
-                                        let median = _mm_mul_ss(sum, half);
-                                        output_col[row] = _mm_cvtss_f32(median);
-                                    }
-                                } else {
-                                    let s_val: f32 = small_heap.peek().unwrap().0;
-                                    let l_val: f32 = large_heap.peek().unwrap().0;
-                                    output_col[row] = (s_val + l_val) / 2.0;
-                                }
-                            }
-
-                            #[cfg(not(target_arch = "x86_64"))]
-                            {
-                                let s_val: f32 = small_heap.peek().unwrap().0;
-                                let l_val: f32 = large_heap.peek().unwrap().0;
-                                output_col[row] = (s_val + l_val) / 2.0;
-                            }
-                        }
-                    }
-                }
-            });
-    });
-    Ok(PyArray2::from_owned_array(py, output).into())
-}
-
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
-    module.add_function(wrap_pyfunction!(move_median_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
     Ok(())
 }
