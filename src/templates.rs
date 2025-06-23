@@ -118,7 +118,7 @@ pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
     length: usize,
-    min_length: usize,
+    min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
@@ -140,10 +140,13 @@ pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
                         let out_val: f32 = input_col[out_idx];
                         if !out_val.is_nan() {
                             observation_count -= 1;
-                            Stat::remove_with_index(&mut deque, out_idx);
+                            if let Some(&(_, front_idx)) = deque.front() {
+                                if front_idx == out_idx {
+                                    deque.pop_front();
+                                }
+                            }
                         }
                     }
-
                     let current: f32 = input_col[row];
                     if !current.is_nan() {
                         observation_count += 1;
@@ -151,7 +154,9 @@ pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
                     }
 
                     if row >= length - 1 && observation_count >= min_length {
-                        output_col[row] = Stat::get_result(&deque);
+                        if let Some(&(val, _)) = deque.front() {
+                            output_col[row] = val;
+                        }
                     }
                 }
             });

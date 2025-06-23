@@ -13,8 +13,6 @@ pub trait StatCalculator {
 pub trait DequeStatCalculator {
     fn new() -> VecDeque<(f32, usize)>;
     fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize);
-    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize);
-    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32;
 }
 pub struct Sum;
 impl StatCalculator for Sum {
@@ -176,18 +174,6 @@ impl DequeStatCalculator for Min {
         }
         deque.push_back((value, idx));
     }
-
-    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize) {
-        if let Some(&(_, front_idx)) = deque.front() {
-            if front_idx == idx {
-                deque.pop_front();
-            }
-        }
-    }
-
-    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32 {
-        if let Some(&(val, _)) = deque.front() { val } else { f32::NAN }
-    }
 }
 
 pub struct Max;
@@ -205,17 +191,5 @@ impl DequeStatCalculator for Max {
             }
         }
         deque.push_back((value, idx));
-    }
-
-    fn remove_with_index(deque: &mut VecDeque<(f32, usize)>, idx: usize) {
-        if let Some(&(_, front_idx)) = deque.front() {
-            if front_idx == idx {
-                deque.pop_front();
-            }
-        }
-    }
-
-    fn get_result(deque: &VecDeque<(f32, usize)>) -> f32 {
-        if let Some(&(val, _)) = deque.front() { val } else { f32::NAN }
     }
 }
