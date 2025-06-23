@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use std::collections::{ VecDeque, BTreeSet };
 use rayon::prelude::*;
-use std::cmp::Ordering;
+use std::cmp::{ Ordering };
 
 #[pyfunction]
 fn move_max<'py>(
@@ -190,16 +190,17 @@ fn move_median_old<'py>(
                         let (old_val, old_idx) = window_q.pop_front().unwrap();
                         if !old_val.is_nan() {
                             let old_item: (OrdF32, usize) = (OrdF32(old_val), old_idx);
-                            if !small_set.remove(&old_item) {
+                            let max_small: &(OrdF32, usize) = small_set.last().unwrap();
+                            if old_item > *max_small {
                                 large_set.remove(&old_item);
+                            } else {
+                                small_set.remove(&old_item);
                             }
                         }
                     }
-
                     if small_set.len() > large_set.len() + 1 {
                         large_set.insert(small_set.pop_last().unwrap());
-                    }
-                    if large_set.len() > small_set.len() {
+                    } else if large_set.len() > small_set.len() {
                         small_set.insert(large_set.pop_first().unwrap());
                     }
 
@@ -222,6 +223,128 @@ fn move_median_old<'py>(
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
+struct IndexedHeap {
+    heap: Vec<(f32, usize)>,
+    positions: Vec<Option<usize>>,
+    is_max_heap: bool,
+}
+
+impl IndexedHeap {
+    fn new(capacity: usize, max_idx: usize, is_max_heap: bool) -> Self {
+        Self {
+            heap: Vec::with_capacity(capacity),
+            positions: vec![None; max_idx],
+            is_max_heap,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.heap.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.heap.is_empty()
+    }
+    fn compare(&self, a: f32, b: f32) -> bool {
+        if self.is_max_heap { a > b } else { a < b }
+    }
+    fn peek(&self) -> Option<(f32, usize)> {
+        self.heap.first().copied()
+    }
+
+    fn push(&mut self, value: f32, idx: usize) {
+        let pos: usize = self.heap.len();
+        self.heap.push((value, idx));
+        self.positions[idx] = Some(pos);
+        self.sift_up(pos);
+    }
+
+    fn pop(&mut self) -> Option<(f32, usize)> {
+        if self.heap.is_empty() {
+            return None;
+        }
+
+        let result: (f32, usize) = self.heap[0];
+        self.positions[result.1] = None;
+
+        let last: (f32, usize) = self.heap.pop().unwrap();
+        if !self.heap.is_empty() {
+            self.heap[0] = last;
+            self.positions[last.1] = Some(0);
+            self.sift_down(0);
+        }
+
+        Some(result)
+    }
+
+    fn remove(&mut self, idx: usize) -> bool {
+        if let Some(pos) = self.positions[idx] {
+            self.positions[idx] = None;
+
+            if pos == self.heap.len() - 1 {
+                self.heap.pop();
+            } else {
+                let last: (f32, usize) = self.heap.pop().unwrap();
+                self.heap[pos] = last;
+                self.positions[last.1] = Some(pos);
+
+                let parent: usize = pos.saturating_sub(1) / 2;
+                if pos > 0 && self.compare(self.heap[pos].0, self.heap[parent].0) {
+                    self.sift_up(pos);
+                } else {
+                    self.sift_down(pos);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fn sift_up(&mut self, mut pos: usize) {
+        while pos > 0 {
+            let parent: usize = (pos - 1) / 2;
+            if !self.compare(self.heap[pos].0, self.heap[parent].0) {
+                break;
+            }
+
+            self.heap.swap(pos, parent);
+            self.positions[self.heap[pos].1] = Some(pos);
+            self.positions[self.heap[parent].1] = Some(parent);
+
+            pos = parent;
+        }
+    }
+
+    fn sift_down(&mut self, mut pos: usize) {
+        let len: usize = self.heap.len();
+        loop {
+            let mut target: usize = pos;
+            let left: usize = 2 * pos + 1;
+            let right: usize = 2 * pos + 2;
+
+            if left < len && self.compare(self.heap[left].0, self.heap[target].0) {
+                target = left;
+            }
+
+            if right < len && self.compare(self.heap[right].0, self.heap[target].0) {
+                target = right;
+            }
+
+            if target == pos {
+                break;
+            }
+
+            // Swap with target child
+            self.heap.swap(pos, target);
+            self.positions[self.heap[pos].1] = Some(pos);
+            self.positions[self.heap[target].1] = Some(target);
+
+            pos = target;
+        }
+    }
+}
+
 #[pyfunction]
 fn move_median<'py>(
     py: Python<'py>,
@@ -242,60 +365,62 @@ fn move_median<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                type MedianItem = (OrdF32, usize);
-                let mut small_set: BTreeSet<MedianItem> = BTreeSet::new();
-                let mut large_set: BTreeSet<MedianItem> = BTreeSet::new();
-
+                let mut small_heap: IndexedHeap = IndexedHeap::new(length, num_rows, true);
+                let mut large_heap: IndexedHeap = IndexedHeap::new(length, num_rows, false);
                 let mut window_q: VecDeque<(f32, usize)> = VecDeque::with_capacity(length + 1);
+                let mut valid_count: usize = 0;
 
                 for row in 0..num_rows {
                     let current_val: f32 = input_col[row];
+
                     window_q.push_back((current_val, row));
 
                     if !current_val.is_nan() {
-                        let current_item: (OrdF32, usize) = (OrdF32(current_val), row);
+                        valid_count += 1;
 
-                        if let Some(max_small) = small_set.last() {
-                            if current_item > *max_small {
-                                large_set.insert(current_item);
+                        if let Some((max_small, _)) = small_heap.peek() {
+                            if current_val > max_small {
+                                large_heap.push(current_val, row);
                             } else {
-                                small_set.insert(current_item);
+                                small_heap.push(current_val, row);
                             }
                         } else {
-                            small_set.insert(current_item);
+                            small_heap.push(current_val, row);
                         }
                     }
 
                     if window_q.len() > length {
                         let (old_val, old_idx) = window_q.pop_front().unwrap();
+
                         if !old_val.is_nan() {
-                            let old_item: (OrdF32, usize) = (OrdF32(old_val), old_idx);
-                            let max_small: &(OrdF32, usize) = small_set.last().unwrap();
-                            if old_item > *max_small {
-                                large_set.remove(&old_item);
+                            valid_count -= 1;
+
+                            if small_heap.remove(old_idx) {
                             } else {
-                                small_set.remove(&old_item);
+                                large_heap.remove(old_idx);
                             }
                         }
                     }
-
-                    // Rebalance the sets to maintain the median property.
-                    if small_set.len() > large_set.len() + 1 {
-                        large_set.insert(small_set.pop_last().unwrap());
-                    } else if large_set.len() > small_set.len() {
-                        small_set.insert(large_set.pop_first().unwrap());
+                    while small_heap.len() > large_heap.len() + 1 {
+                        if let Some((val, idx)) = small_heap.pop() {
+                            large_heap.push(val, idx);
+                        }
                     }
 
-                    if window_q.len() >= length {
-                        let observation_count: usize = small_set.len() + large_set.len();
-                        if observation_count >= min_length {
-                            if small_set.len() > large_set.len() {
-                                output_col[row] = small_set.last().unwrap().0.0;
-                            } else if !small_set.is_empty() {
-                                let s_val: f32 = small_set.last().unwrap().0.0;
-                                let l_val: f32 = large_set.first().unwrap().0.0;
-                                output_col[row] = (s_val + l_val) / 2.0;
+                    while large_heap.len() > small_heap.len() {
+                        if let Some((val, idx)) = large_heap.pop() {
+                            small_heap.push(val, idx);
+                        }
+                    }
+                    if window_q.len() >= length && valid_count >= min_length {
+                        if small_heap.len() > large_heap.len() {
+                            if let Some((val, _)) = small_heap.peek() {
+                                output_col[row] = val;
                             }
+                        } else if !small_heap.is_empty() {
+                            let s_val: f32 = small_heap.peek().unwrap().0;
+                            let l_val: f32 = large_heap.peek().unwrap().0;
+                            output_col[row] = (s_val + l_val) / 2.0;
                         }
                     }
                 }
