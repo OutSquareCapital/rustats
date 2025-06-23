@@ -65,7 +65,7 @@ fn calculate_moving_statistic<Calculator: calculators::StatCalculator>(
 }
 
 #[pyfunction]
-fn move_sum_test<'py>(
+fn move_sum<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -75,13 +75,53 @@ fn move_sum_test<'py>(
 }
 
 #[pyfunction]
-fn move_mean_test<'py>(
+fn move_mean<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     calculate_moving_statistic::<calculators::Mean>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_var<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Var>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_std<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Stdev>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_skewness_parallel<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Skewness>(py, array, length, min_length)
+}
+
+#[pyfunction]
+fn move_kurtosis_parallel<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    calculate_moving_statistic::<calculators::Kurtosis>(py, array, length, min_length)
 }
 
 #[pyfunction]
@@ -255,7 +295,7 @@ fn move_kurtosis<'py>(
 }
 
 #[pyfunction]
-fn move_skewness_parallel<'py>(
+fn move_skewness_parallel_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -335,7 +375,7 @@ fn move_skewness_parallel<'py>(
 }
 
 #[pyfunction]
-fn move_kurtosis_parallel<'py>(
+fn move_kurtosis_parallel_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -431,123 +471,7 @@ fn move_kurtosis_parallel<'py>(
 }
 
 #[pyfunction]
-fn move_sum<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut sum: f64 = 0.0;
-                let mut observation_count: usize = 0;
-
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        sum += current;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = sum as f32;
-                    }
-                }
-
-                for row in length..num_rows {
-                    let current: f64 = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent: f64 = input_col[precedent_idx] as f64;
-
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        sum += current;
-                    }
-
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        sum -= precedent;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = sum as f32;
-                    }
-                }
-            });
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_mean<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut mean_sum: f64 = 0.0;
-                let mut observation_count: usize = 0;
-
-                for row in 0..length {
-                    let current: f64 = input_col[row] as f64;
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_mean(mean_sum, observation_count) as f32;
-                    }
-                }
-
-                for row in length..num_rows {
-                    let current = input_col[row] as f64;
-                    let precedent_idx: usize = row - length;
-                    let precedent = input_col[precedent_idx] as f64;
-
-                    if !current.is_nan() {
-                        observation_count += 1;
-                        mean_sum += current;
-                    }
-
-                    if !precedent.is_nan() {
-                        observation_count -= 1;
-                        mean_sum -= precedent;
-                    }
-
-                    if observation_count >= min_length {
-                        output_col[row] = stats::get_mean(mean_sum, observation_count) as f32;
-                    }
-                }
-            });
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-#[pyfunction]
-fn move_var<'py>(
+fn move_var_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -617,7 +541,7 @@ fn move_var<'py>(
 }
 
 #[pyfunction]
-fn move_std<'py>(
+fn move_std_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -887,8 +811,10 @@ fn move_median<'py>(
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(move_mean_test, module)?)?;
-    module.add_function(wrap_pyfunction!(move_sum_test, module)?)?;
+    module.add_function(wrap_pyfunction!(move_kurtosis_parallel_old, module)?)?;
+    module.add_function(wrap_pyfunction!(move_skewness_parallel_old, module)?)?;
+    module.add_function(wrap_pyfunction!(move_std_old, module)?)?;
+    module.add_function(wrap_pyfunction!(move_var_old, module)?)?;
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
     module.add_function(wrap_pyfunction!(move_std, module)?)?;
     module.add_function(wrap_pyfunction!(move_var, module)?)?;

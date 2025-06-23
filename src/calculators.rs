@@ -43,7 +43,7 @@ impl StatCalculator for Mean {
         stats::get_mean(*state, count) as f32
     }
 }
-struct Var;
+pub struct Var;
 impl StatCalculator for Var {
     type State = (f64, f64);
 
@@ -63,7 +63,7 @@ impl StatCalculator for Var {
     }
 }
 
-struct Stdev;
+pub struct Stdev;
 impl StatCalculator for Stdev {
     type State = (f64, f64);
 
@@ -83,7 +83,7 @@ impl StatCalculator for Stdev {
     }
 }
 
-struct Skewness;
+pub struct Skewness;
 impl StatCalculator for Skewness {
     type State = (f64, f64, f64, f64);
 
@@ -112,7 +112,7 @@ impl StatCalculator for Skewness {
         stats::get_skew(state.0, state.1, state.2, count) as f32
     }
 }
-struct Kurtosis;
+pub struct Kurtosis;
 impl StatCalculator for Kurtosis {
     type State = (f64, f64, f64, f64, f64, f64);
 
