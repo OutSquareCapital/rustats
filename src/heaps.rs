@@ -1,10 +1,10 @@
-pub struct IndexedHeap {
+pub struct Indexed {
     heap: Vec<(f32, usize)>,
     positions: Vec<Option<usize>>,
     is_max_heap: bool,
 }
 
-impl IndexedHeap {
+impl Indexed {
     pub fn new(capacity: usize, max_idx: usize, is_max_heap: bool) -> Self {
         Self {
             heap: Vec::with_capacity(capacity),
