@@ -5,6 +5,56 @@ use std::collections::{ VecDeque };
 use rayon::prelude::*;
 
 #[pyfunction]
+fn move_mean<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let shape: &[usize] = array.shape();
+    let num_rows: usize = shape[0];
+    let num_cols: usize = shape[1];
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+
+    py.allow_threads(|| {
+        for col in 0..num_cols {
+            let mut mean_sum: f32 = 0.0;
+            let mut observation_count: usize = 0;
+            for row in 0..num_rows {
+                let current: f32 = array[[row, col]];
+                if !current.is_nan() {
+                    observation_count += 1;
+                    mean_sum += current;
+                }
+                if observation_count >= min_length {
+                    let mean: f32 = mean_sum / (observation_count as f32);
+                    output[[row, col]] = mean;
+                }
+            }
+            for row in length..num_rows {
+                let current: f32 = array[[row, col]];
+                let precedent_idx: usize = row - length;
+                let precedent: f32 = array[[precedent_idx, col]];
+                if !current.is_nan() {
+                    observation_count += 1;
+                    mean_sum += current;
+                }
+                if !precedent.is_nan() {
+                    observation_count -= 1;
+                    mean_sum -= precedent;
+                }
+                if observation_count >= min_length {
+                    let mean: f32 = mean_sum / (observation_count as f32);
+                    output[[row, col]] = mean;
+                }
+            }
+        }
+    });
+    Ok(PyArray2::from_owned_array(py, output).into())
+}
+
+#[pyfunction]
 fn move_max<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
@@ -338,6 +388,7 @@ fn move_median<'py>(
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
