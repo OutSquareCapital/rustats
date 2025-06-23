@@ -5,7 +5,7 @@ use std::collections::{ VecDeque };
 use rayon::prelude::*;
 
 #[pyfunction]
-fn move_mean_old<'py>(
+fn move_sum<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
@@ -17,20 +17,23 @@ fn move_mean_old<'py>(
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
-    py.allow_threads(|| {
-        for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-            let mut mean_sum: f32 = 0.0;
+    py.allow_threads(move ||{
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+            let mut sum: f32 = 0.0;
             let mut observation_count: usize = 0;
 
             for row in 0..length {
                 let current: f32 = input_col[row];
                 if !current.is_nan() {
                     observation_count += 1;
-                    mean_sum += current;
+                    sum += current;
                 }
 
                 if observation_count >= min_length {
-                    output_col[row] = mean_sum / (observation_count as f32);
+                    output_col[row] = sum;
                 }
             }
 
@@ -41,19 +44,19 @@ fn move_mean_old<'py>(
 
                 if !current.is_nan() {
                     observation_count += 1;
-                    mean_sum += current;
+                    sum += current;
                 }
 
                 if !precedent.is_nan() {
                     observation_count -= 1;
-                    mean_sum -= precedent;
+                    sum -= precedent;
                 }
 
                 if observation_count >= min_length {
-                    output_col[row] = mean_sum / (observation_count as f32);
+                    output_col[row] = sum;
                 }
             }
-        }
+        });
     });
 
     Ok(output.into_pyarray(py).into())
@@ -445,7 +448,7 @@ fn move_median<'py>(
 
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(move_mean_old, module)?)?;
+    module.add_function(wrap_pyfunction!(move_sum, module)?)?;
     module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
