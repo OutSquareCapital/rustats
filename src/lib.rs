@@ -1,4 +1,4 @@
-use numpy::{ PyArray2, PyReadonlyArray2 };
+use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray };
 use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
@@ -51,7 +51,7 @@ fn move_mean<'py>(
             }
         }
     });
-    Ok(PyArray2::from_owned_array(py, output).into())
+    Ok(output.into_pyarray(py).into())
 }
 
 #[pyfunction]
@@ -62,9 +62,7 @@ fn move_max<'py>(
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
-    let shape: &[usize] = array.shape();
-    let num_rows: usize = shape[0];
-    let num_cols: usize = shape[1];
+    let (num_rows, num_cols) = array.dim();
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
@@ -122,9 +120,7 @@ fn move_min<'py>(
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
-    let shape: &[usize] = array.shape();
-    let num_rows: usize = shape[0];
-    let num_cols: usize = shape[1];
+    let (num_rows, num_cols) = array.dim();
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
@@ -309,9 +305,7 @@ fn move_median<'py>(
     min_length: usize
 ) -> PyResult<Py<PyArray2<f32>>> {
     let array = array.as_array();
-    let shape: &[usize] = array.shape();
-    let num_rows: usize = shape[0];
-    let num_cols: usize = shape[1];
+    let (num_rows, num_cols) = array.dim();
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
