@@ -3,17 +3,7 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
 use rayon::prelude::*;
-
-#[inline(always)]
-fn get_var(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f32 {
-    (mean_square_sum / (observation_count as f64) -
-        (mean_sum / (observation_count as f64)).powi(2)) as f32
-}
-
-#[inline(always)]
-fn get_std(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f32 {
-    get_var(mean_sum, mean_square_sum, observation_count).sqrt()
-}
+mod stats;
 
 #[pyfunction]
 fn move_sum<'py>(
@@ -33,25 +23,25 @@ fn move_sum<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut sum: f32 = 0.0;
+                let mut sum: f64 = 0.0;
                 let mut observation_count: usize = 0;
 
                 for row in 0..length {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     if !current.is_nan() {
                         observation_count += 1;
                         sum += current;
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = sum;
+                        output_col[row] = sum as f32;
                     }
                 }
 
                 for row in length..num_rows {
-                    let current: f32 = input_col[row];
+                    let current: f64 = input_col[row] as f64;
                     let precedent_idx: usize = row - length;
-                    let precedent: f32 = input_col[precedent_idx];
+                    let precedent: f64 = input_col[precedent_idx] as f64;
 
                     if !current.is_nan() {
                         observation_count += 1;
@@ -64,7 +54,7 @@ fn move_sum<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = sum;
+                        output_col[row] = sum as f32;
                     }
                 }
             });
@@ -102,7 +92,7 @@ fn move_mean<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = mean_sum / (observation_count as f32);
+                        output_col[row] = stats::get_mean(mean_sum, observation_count);
                     }
                 }
 
@@ -122,7 +112,7 @@ fn move_mean<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = mean_sum / (observation_count as f32);
+                        output_col[row] = stats::get_mean(mean_sum, observation_count);
                     }
                 }
             });
@@ -162,7 +152,11 @@ fn move_var<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_var(mean_sum, mean_square_sum, observation_count);
+                        output_col[row] = stats::get_var(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ) as f32;
                     }
                 }
 
@@ -184,7 +178,11 @@ fn move_var<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_var(mean_sum, mean_square_sum, observation_count);
+                        output_col[row] = stats::get_var(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ) as f32;
                     }
                 }
             });
@@ -224,7 +222,11 @@ fn move_std<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_std(mean_sum, mean_square_sum, observation_count);
+                        output_col[row] = stats::get_std(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ) as f32;
                     }
                 }
 
@@ -246,7 +248,11 @@ fn move_std<'py>(
                     }
 
                     if observation_count >= min_length {
-                        output_col[row] = get_std(mean_sum, mean_square_sum, observation_count);
+                        output_col[row] = stats::get_std(
+                            mean_sum,
+                            mean_square_sum,
+                            observation_count
+                        ) as f32;
                     }
                 }
             });
@@ -371,133 +377,6 @@ fn move_min<'py>(
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
-struct IndexedHeap {
-    heap: Vec<(f32, usize)>,
-    positions: Vec<Option<usize>>,
-    is_max_heap: bool,
-}
-
-impl IndexedHeap {
-    fn new(capacity: usize, max_idx: usize, is_max_heap: bool) -> Self {
-        Self {
-            heap: Vec::with_capacity(capacity),
-            positions: vec![None; max_idx],
-            is_max_heap,
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.heap.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.heap.is_empty()
-    }
-    #[inline(always)]
-    fn compare(&self, a: f32, b: f32) -> bool {
-        let result: bool = a > b;
-        result == self.is_max_heap
-    }
-
-    fn peek(&self) -> Option<(f32, usize)> {
-        self.heap.first().copied()
-    }
-
-    fn push(&mut self, value: f32, idx: usize) {
-        let pos: usize = self.heap.len();
-        self.heap.push((value, idx));
-        self.positions[idx] = Some(pos);
-        self.sift_up(pos);
-    }
-
-    fn pop(&mut self) -> Option<(f32, usize)> {
-        if self.heap.is_empty() {
-            return None;
-        }
-
-        let result: (f32, usize) = self.heap[0];
-        self.positions[result.1] = None;
-
-        let last: (f32, usize) = self.heap.pop().unwrap();
-        if !self.heap.is_empty() {
-            self.heap[0] = last;
-            self.positions[last.1] = Some(0);
-            self.sift_down(0);
-        }
-
-        Some(result)
-    }
-
-    fn remove(&mut self, idx: usize) -> bool {
-        if let Some(pos) = self.positions[idx] {
-            self.positions[idx] = None;
-
-            if pos == self.heap.len() - 1 {
-                self.heap.pop();
-            } else {
-                let last: (f32, usize) = self.heap.pop().unwrap();
-                self.heap[pos] = last;
-                self.positions[last.1] = Some(pos);
-
-                let parent: usize = pos.saturating_sub(1) / 2;
-                if pos > 0 && self.compare(self.heap[pos].0, self.heap[parent].0) {
-                    self.sift_up(pos);
-                } else {
-                    self.sift_down(pos);
-                }
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    fn sift_up(&mut self, mut pos: usize) {
-        while pos > 0 {
-            let parent: usize = (pos - 1) / 2;
-            if !self.compare(self.heap[pos].0, self.heap[parent].0) {
-                break;
-            }
-
-            self.heap.swap(pos, parent);
-            self.positions[self.heap[pos].1] = Some(pos);
-            self.positions[self.heap[parent].1] = Some(parent);
-
-            pos = parent;
-        }
-    }
-
-    fn sift_down(&mut self, mut pos: usize) {
-        let len: usize = self.heap.len();
-        let node_value: f32 = self.heap[pos].0;
-        let node_idx: usize = self.heap[pos].1;
-
-        loop {
-            let left: usize = 2 * pos + 1;
-            if left >= len {
-                break;
-            }
-
-            let right: usize = left + 1;
-            let target = if right < len && self.compare(self.heap[right].0, self.heap[left].0) {
-                right
-            } else {
-                left
-            };
-
-            if !self.compare(self.heap[target].0, node_value) {
-                break;
-            }
-            self.heap[pos] = self.heap[target];
-            self.positions[self.heap[pos].1] = Some(pos);
-
-            pos = target;
-        }
-        self.heap[pos] = (node_value, node_idx);
-        self.positions[node_idx] = Some(pos);
-    }
-}
-
 #[pyfunction]
 fn move_median<'py>(
     py: Python<'py>,
@@ -516,8 +395,8 @@ fn move_median<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut small_heap: IndexedHeap = IndexedHeap::new(length, num_rows, true);
-                let mut large_heap: IndexedHeap = IndexedHeap::new(length, num_rows, false);
+                let mut small_heap = stats::IndexedHeap::new(length, num_rows, true);
+                let mut large_heap = stats::IndexedHeap::new(length, num_rows, false);
                 let mut window_q: VecDeque<(f32, usize)> = VecDeque::with_capacity(length + 1);
                 let mut valid_count: usize = 0;
 
