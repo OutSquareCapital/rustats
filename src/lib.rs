@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use std::collections::{ VecDeque };
 use rayon::prelude::*;
+use std::arch::x86_64::*;
 
 #[pyfunction]
 fn move_max<'py>(
@@ -350,7 +351,8 @@ fn move_median<'py>(
     let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
+    #[cfg(target_arch = "x86_64")]
+    let use_simd: bool = is_x86_feature_detected!("sse2");
     py.allow_threads(move || {
         input_columns
             .into_par_iter()
@@ -404,21 +406,42 @@ fn move_median<'py>(
                             small_heap.push(val, idx);
                         }
                     }
+
                     if window_q.len() >= length && valid_count >= min_length {
                         if small_heap.len() > large_heap.len() {
                             if let Some((val, _)) = small_heap.peek() {
                                 output_col[row] = val;
                             }
                         } else if !small_heap.is_empty() {
-                            let s_val: f32 = small_heap.peek().unwrap().0;
-                            let l_val: f32 = large_heap.peek().unwrap().0;
-                            output_col[row] = (s_val + l_val) / 2.0;
+                            #[cfg(target_arch = "x86_64")]
+                            {
+                                if use_simd {
+                                    unsafe {
+                                        let s_val = _mm_set_ss(small_heap.peek().unwrap().0);
+                                        let l_val = _mm_set_ss(large_heap.peek().unwrap().0);
+                                        let sum = _mm_add_ss(s_val, l_val);
+                                        let half = _mm_set_ss(0.5);
+                                        let median = _mm_mul_ss(sum, half);
+                                        output_col[row] = _mm_cvtss_f32(median);
+                                    }
+                                } else {
+                                    let s_val: f32 = small_heap.peek().unwrap().0;
+                                    let l_val: f32 = large_heap.peek().unwrap().0;
+                                    output_col[row] = (s_val + l_val) / 2.0;
+                                }
+                            }
+
+                            #[cfg(not(target_arch = "x86_64"))]
+                            {
+                                let s_val: f32 = small_heap.peek().unwrap().0;
+                                let l_val: f32 = large_heap.peek().unwrap().0;
+                                output_col[row] = (s_val + l_val) / 2.0;
+                            }
                         }
                     }
                 }
             });
     });
-
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
