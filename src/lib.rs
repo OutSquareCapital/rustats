@@ -177,6 +177,7 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(medians::move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
+    module.add_function(wrap_pyfunction!(ranking::move_rank_test, module)?)?;
     module.add_function(wrap_pyfunction!(ranking::move_rank, module)?)?;
     module.add_function(wrap_pyfunction!(agg_sum, module)?)?;
     module.add_function(wrap_pyfunction!(agg_std, module)?)?;

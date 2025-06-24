@@ -193,3 +193,34 @@ impl DequeStatCalculator for Max {
         deque.push_back((value, idx));
     }
 }
+
+pub struct Rank {
+    greater_count: usize,
+    equal_count: usize,
+    pub valid_count: usize,
+}
+impl Rank {
+    pub fn new() -> Self {
+        Self {
+            greater_count: 0,
+            equal_count: 1,
+            valid_count: 1,
+        }
+    }
+
+    pub fn add(&mut self, other: f32, current: f32) {
+        if other.is_nan() {
+            return;
+        }
+        self.valid_count += 1;
+        if current > other {
+            self.greater_count += 2;
+        } else if current == other {
+            self.equal_count += 1;
+        }
+    }
+
+    pub fn get(&self) -> f32 {
+        stats::rank(self.greater_count, self.equal_count, self.valid_count)
+    }
+}
