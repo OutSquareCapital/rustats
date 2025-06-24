@@ -95,6 +95,7 @@ fn move_parallel<Stat: calculators::StatCalculator>(
     let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+    py.allow_threads(move || {
     input_columns
         .into_par_iter()
         .zip(output_columns.par_iter_mut())
@@ -131,7 +132,7 @@ fn move_parallel<Stat: calculators::StatCalculator>(
                 }
             }
         });
-
+    });
     Ok(output.into_pyarray(py).into())
 }
 
