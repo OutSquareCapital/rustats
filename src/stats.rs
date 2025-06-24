@@ -5,7 +5,7 @@ pub fn mean(mean_sum: f64, observation_count: usize) -> f64 {
 #[inline(always)]
 pub fn var(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f64 {
     let obs: f64 = observation_count as f64;
-    mean_square_sum / obs - (mean_sum / obs).powi(2)
+    (mean_square_sum / obs - (mean_sum / obs).powi(2)) * (obs / (obs - 1.0))
 }
 
 #[inline(always)]
