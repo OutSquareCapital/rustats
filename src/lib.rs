@@ -13,9 +13,10 @@ fn move_sum<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Sum>(py, array, length, min_length)
+    templates::move_template::<calculators::Sum>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -23,9 +24,10 @@ fn move_mean<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Mean>(py, array, length, min_length)
+    templates::move_template::<calculators::Mean>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -33,9 +35,10 @@ fn move_var<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Var>(py, array, length, min_length)
+    templates::move_template::<calculators::Var>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -43,9 +46,10 @@ fn move_std<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Stdev>(py, array, length, min_length)
+    templates::move_template::<calculators::Stdev>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -53,19 +57,10 @@ fn move_skewness<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_single::<calculators::Skewness>(py, array, length, min_length)
-}
-
-#[pyfunction]
-fn move_skewness_parallel<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Skewness>(py, array, length, min_length)
+    templates::move_template::<calculators::Skewness>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -73,19 +68,10 @@ fn move_kurtosis<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_single::<calculators::Kurtosis>(py, array, length, min_length)
-}
-
-#[pyfunction]
-fn move_kurtosis_parallel<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_parallel::<calculators::Kurtosis>(py, array, length, min_length)
+    templates::move_template::<calculators::Kurtosis>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -93,9 +79,10 @@ fn move_min<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_deque_parallel::<calculators::Min>(py, array, length, min_length)
+    templates::move_deque_template::<calculators::Min>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -103,9 +90,10 @@ fn move_max<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
     length: usize,
-    min_length: usize
+    min_length: usize,
+    parallel: bool
 ) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_deque_parallel::<calculators::Max>(py, array, length, min_length)
+    templates::move_deque_template::<calculators::Max>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -274,9 +262,7 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
     module.add_function(wrap_pyfunction!(move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
-    module.add_function(wrap_pyfunction!(move_skewness_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
-    module.add_function(wrap_pyfunction!(move_kurtosis_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_rank, module)?)?;
     Ok(())
 }

@@ -4,7 +4,35 @@ use numpy::ndarray::Array2;
 use rayon::prelude::*;
 use crate::calculators;
 
-pub fn move_parallel<Stat: calculators::StatCalculator>(
+pub fn move_template<Stat: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize,
+    parallel: bool
+) -> PyResult<Py<PyArray2<f32>>> {
+    if parallel {
+        return move_parallel::<Stat>(py, array, length, min_length);
+    }
+
+    move_single::<Stat>(py, array, length, min_length)
+}
+
+pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize,
+    parallel: bool
+) -> PyResult<Py<PyArray2<f32>>> {
+    if parallel {
+        return move_deque_parallel::<Stat>(py, array, length, min_length);
+    }
+
+    move_deque_single::<Stat>(py, array, length, min_length)
+}
+
+fn move_parallel<Stat: calculators::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
     length: usize,
@@ -61,7 +89,7 @@ pub fn move_parallel<Stat: calculators::StatCalculator>(
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_single<Stat: calculators::StatCalculator>(
+fn move_single<Stat: calculators::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
     length: usize,
@@ -114,7 +142,7 @@ pub fn move_single<Stat: calculators::StatCalculator>(
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
+fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
     length: usize,
@@ -168,5 +196,58 @@ pub fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
             });
     });
 
+    Ok(output.into_pyarray(py).into())
+}
+
+fn move_deque_single<Stat: calculators::DequeStatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
+            let mut deque = Stat::new();
+            let mut observation_count: usize = 0;
+
+            for row in 0..length {
+                let current: f32 = input_col[row];
+                if !current.is_nan() {
+                    observation_count += 1;
+                    Stat::add_with_index(&mut deque, current, row);
+                }
+            }
+
+            for row in length..num_rows {
+                let out_idx: usize = row - length;
+                let out_val: f32 = input_col[out_idx];
+                if !out_val.is_nan() {
+                    observation_count -= 1;
+                    if let Some(&(_, front_idx)) = deque.front() {
+                        if front_idx == out_idx {
+                            deque.pop_front();
+                        }
+                    }
+                }
+                let current: f32 = input_col[row];
+                if !current.is_nan() {
+                    observation_count += 1;
+                    Stat::add_with_index(&mut deque, current, row);
+                }
+
+                if observation_count >= min_length {
+                    if let Some(&(val, _)) = deque.front() {
+                        output_col[row] = val;
+                    }
+                }
+            }
+        }
+    });
     Ok(output.into_pyarray(py).into())
 }
