@@ -166,6 +166,16 @@ fn agg_max<'py>(
     templates::agg_deque_template::<calculators::Max>(py, array, parallel)
 }
 
+#[pyfunction]
+fn move_sum_test<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize,
+    parallel: bool
+) -> PyResult<Py<PyArray2<f32>>> {
+    templates::move_template_test::<calculators::Sum>(py, array, length, min_length, parallel)
+}
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
@@ -188,5 +198,6 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(agg_kurtosis, module)?)?;
     module.add_function(wrap_pyfunction!(medians::agg_median, module)?)?;
     module.add_function(wrap_pyfunction!(ranking::agg_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(move_sum_test, module)?)?;
     Ok(())
 }

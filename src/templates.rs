@@ -1,8 +1,36 @@
 use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray };
 use pyo3::prelude::*;
-use numpy::ndarray::Array2;
+use numpy::ndarray::{ Array2, ArrayBase, ViewRepr, Dim };
 use rayon::prelude::*;
 use crate::calculators;
+
+struct WindowState {
+    observations: usize,
+    current: f64,
+    precedent: f64,
+    precedent_idx: usize,
+}
+impl WindowState {
+    fn new() -> Self {
+        Self {
+            observations: 0,
+            current: f64::NAN,
+            precedent: f64::NAN,
+            precedent_idx: 0,
+        }
+    }
+
+    fn refresh(
+        &mut self,
+        input_col: &ArrayBase<ViewRepr<&f32>, Dim<[usize; 1]>>,
+        row: usize,
+        length: usize
+    ) {
+        self.current = input_col[row] as f64;
+        self.precedent_idx = row - length;
+        self.precedent = input_col[self.precedent_idx] as f64;
+    }
+}
 
 pub fn move_template<Stat: calculators::StatCalculator>(
     py: Python<'_>,
@@ -16,6 +44,21 @@ pub fn move_template<Stat: calculators::StatCalculator>(
     }
 
     move_single::<Stat>(py, array, length, min_length)
+}
+
+
+pub fn move_template_test<Stat: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize,
+    parallel: bool
+) -> PyResult<Py<PyArray2<f32>>> {
+    if parallel {
+        return move_parallel_test::<Stat>(py, array, length, min_length);
+    }
+
+    move_single_test::<Stat>(py, array, length, min_length)
 }
 
 pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
@@ -113,6 +156,110 @@ fn move_parallel<Stat: calculators::StatCalculator>(
     Ok(output.into_pyarray(py).into())
 }
 
+fn move_parallel_test<Stat: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut state = Stat::new();
+                let mut window = WindowState::new();
+
+                for row in 0..length {
+                    let current: f64 = input_col[row] as f64;
+                    if !current.is_nan() {
+                        window.observations += 1;
+                        Stat::add_value(&mut state, current);
+                    }
+
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
+                }
+
+                for row in length..num_rows {
+                    window.refresh(&input_col, row, length);
+                    if !window.current.is_nan() {
+                        window.observations += 1;
+                        Stat::add_value(&mut state, window.current);
+                    }
+
+                    if !window.precedent.is_nan() {
+                        window.observations -= 1;
+                        Stat::remove_value(&mut state, window.precedent);
+                    }
+
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
+                }
+            });
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
+fn move_single_test<Stat: calculators::StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
+            let mut state = Stat::new();
+            let mut window = WindowState::new();
+
+            for row in 0..length {
+                let current: f64 = input_col[row] as f64;
+                if !current.is_nan() {
+                    window.observations += 1;
+                    Stat::add_value(&mut state, current);
+                }
+
+                if window.observations >= min_length {
+                    output_col[row] = Stat::get(&state, window.observations);
+                }
+            }
+
+            for row in length..num_rows {
+                window.refresh(&input_col, row, length);
+                if !window.current.is_nan() {
+                    window.observations += 1;
+                    Stat::add_value(&mut state, window.current);
+                }
+
+                if !window.precedent.is_nan() {
+                    window.observations -= 1;
+                    Stat::remove_value(&mut state, window.precedent);
+                }
+                if window.observations >= min_length {
+                    output_col[row] = Stat::get(&state, window.observations);
+                }
+            }
+        }
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
 fn move_single<Stat: calculators::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f32>,
@@ -195,22 +342,22 @@ fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
                 }
 
                 for row in length..num_rows {
-                    let out_idx: usize = row - length;
-                    let out_val: f32 = input_col[out_idx];
-                    if !out_val.is_nan() {
+                    let current: f32 = input_col[row];
+                    let precedent_idx: usize = row - length;
+                    let precedent: f32 = input_col[precedent_idx];
+                    if !precedent.is_nan() {
                         observation_count -= 1;
                         if let Some(&(_, front_idx)) = deque.front() {
-                            if front_idx == out_idx {
+                            if front_idx == precedent_idx {
                                 deque.pop_front();
                             }
                         }
                     }
-                    let current: f32 = input_col[row];
+
                     if !current.is_nan() {
                         observation_count += 1;
                         Stat::add_with_index(&mut deque, current, row);
                     }
-
                     if observation_count >= min_length {
                         if let Some(&(val, _)) = deque.front() {
                             output_col[row] = val;
@@ -249,17 +396,17 @@ fn move_deque_single<Stat: calculators::DequeStatCalculator>(
             }
 
             for row in length..num_rows {
-                let out_idx: usize = row - length;
-                let out_val: f32 = input_col[out_idx];
-                if !out_val.is_nan() {
+                let current: f32 = input_col[row];
+                let precedent_idx: usize = row - length;
+                let precedent: f32 = input_col[precedent_idx];
+                if !precedent.is_nan() {
                     observation_count -= 1;
                     if let Some(&(_, front_idx)) = deque.front() {
-                        if front_idx == out_idx {
+                        if front_idx == precedent_idx {
                             deque.pop_front();
                         }
                     }
                 }
-                let current: f32 = input_col[row];
                 if !current.is_nan() {
                     observation_count += 1;
                     Stat::add_with_index(&mut deque, current, row);
