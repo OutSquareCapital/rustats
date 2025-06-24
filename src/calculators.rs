@@ -58,11 +58,11 @@ impl StatCalculator for Var {
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
-        state.1 += value * value;
+        state.1 += value.powi(2);
     }
     fn remove_value(state: &mut Self::State, value: f64) {
         state.0 -= value;
-        state.1 -= value * value;
+        state.1 -= value.powi(2);
     }
     fn get(state: &Self::State, count: usize) -> f32 {
         stats::var(state.0, state.1, count) as f32
@@ -78,11 +78,11 @@ impl StatCalculator for Stdev {
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
-        state.1 += value * value;
+        state.1 += value.powi(2);
     }
     fn remove_value(state: &mut Self::State, value: f64) {
         state.0 -= value;
-        state.1 -= value * value;
+        state.1 -= value.powi(2);
     }
     fn get(state: &Self::State, count: usize) -> f32 {
         stats::stdev(state.0, state.1, count) as f32
