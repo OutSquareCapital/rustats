@@ -58,6 +58,7 @@ pub fn kurtosis(
     kurt
 }
 
+
 #[inline(always)]
 pub fn rank(greater_count: f32, equal_count: f32, valid_count: f32) -> f32 {
     if valid_count == 1.0 {
@@ -65,6 +66,19 @@ pub fn rank(greater_count: f32, equal_count: f32, valid_count: f32) -> f32 {
     } else {
         let raw_rank: f32 = 0.5 * (greater_count + equal_count - 1.0);
         let normalized_rank: f32 = 2.0 * (raw_rank / (valid_count - 1.0) - 0.5);
+        normalized_rank
+    }
+}
+
+
+
+#[inline(always)]
+pub fn rank_test(greater_count: usize, equal_count: usize, valid_count: usize) -> f32 {
+    if valid_count == 1 {
+        0.0
+    } else {
+        let raw_rank: f32 = 0.5 * (greater_count + equal_count - 1) as f32;
+        let normalized_rank: f32 = 2.0 * (raw_rank / (valid_count - 1) as f32 - 0.5);
         normalized_rank
     }
 }

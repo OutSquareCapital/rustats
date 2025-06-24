@@ -264,6 +264,80 @@ fn move_rank<'py>(
     Ok(PyArray2::from_owned_array(py, output).into())
 }
 
+
+#[pyfunction]
+fn move_rank_test<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f32>,
+    length: usize,
+    min_length: usize
+) -> PyResult<Py<PyArray2<f32>>> {
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                for row in min_length..length {
+                    let current: f32 = input_col[row];
+                    if current.is_nan() {
+                        continue;
+                    }
+                    let mut greater_count = 0;
+                    let mut equal_count = 1;
+                    let mut valid_count = 1;
+                    for j in 0..row {
+                        let other: f32 = input_col[j];
+                        if !other.is_nan() {
+                            valid_count += 1;
+                            if current > other {
+                                greater_count += 2;
+                            } else if current == other {
+                                equal_count += 1;
+                            }
+                        }
+                    }
+
+                    if valid_count >= min_length {
+                        output_col[row] = stats::rank_test(greater_count, equal_count, valid_count);
+                    }
+                }
+                for row in length..num_rows {
+                    let current: f32 = input_col[row];
+                    if current.is_nan() {
+                        continue;
+                    }
+                    let mut greater_count = 0;
+                    let mut equal_count = 1;
+                    let mut valid_count = 1;
+                    let start_idx: usize = row - length + 1;
+                    for j in start_idx..row {
+                        let other: f32 = input_col[j];
+                        if !other.is_nan() {
+                            valid_count += 1;
+                            if current > other {
+                                greater_count += 2;
+                            } else if current == other {
+                                equal_count += 1;
+                            }
+                        }
+                    }
+
+                    if valid_count >= min_length {
+                        output_col[row] = stats::rank_test(greater_count, equal_count, valid_count);
+                    }
+                }
+            });
+    });
+
+    Ok(PyArray2::from_owned_array(py, output).into())
+}
+
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
@@ -278,5 +352,6 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(move_rank_test, module)?)?;
     Ok(())
 }
