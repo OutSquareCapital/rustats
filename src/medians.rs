@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use std::cmp::Ordering;
 
 struct Indexed {
-    heap: Vec<(f32, usize)>,
+    heap: Vec<(f64, usize)>,
     positions: Vec<Option<usize>>,
     is_max_heap: bool,
 }
@@ -28,31 +28,31 @@ impl Indexed {
         self.heap.is_empty()
     }
     #[inline(always)]
-    pub fn compare(&self, a: f32, b: f32) -> bool {
+    pub fn compare(&self, a: f64, b: f64) -> bool {
         let result: bool = a > b;
         result == self.is_max_heap
     }
 
-    pub fn peek(&self) -> Option<(f32, usize)> {
+    pub fn peek(&self) -> Option<(f64, usize)> {
         self.heap.first().copied()
     }
 
-    pub fn push(&mut self, value: f32, idx: usize) {
+    pub fn push(&mut self, value: f64, idx: usize) {
         let pos: usize = self.heap.len();
         self.heap.push((value, idx));
         self.positions[idx] = Some(pos);
         self.sift_up(pos);
     }
 
-    pub fn pop(&mut self) -> Option<(f32, usize)> {
+    pub fn pop(&mut self) -> Option<(f64, usize)> {
         if self.heap.is_empty() {
             return None;
         }
 
-        let result: (f32, usize) = self.heap[0];
+        let result: (f64, usize) = self.heap[0];
         self.positions[result.1] = None;
 
-        let last: (f32, usize) = self.heap.pop().unwrap();
+        let last: (f64, usize) = self.heap.pop().unwrap();
         if !self.heap.is_empty() {
             self.heap[0] = last;
             self.positions[last.1] = Some(0);
@@ -69,7 +69,7 @@ impl Indexed {
             if pos == self.heap.len() - 1 {
                 self.heap.pop();
             } else {
-                let last: (f32, usize) = self.heap.pop().unwrap();
+                let last: (f64, usize) = self.heap.pop().unwrap();
                 self.heap[pos] = last;
                 self.positions[last.1] = Some(pos);
 
@@ -103,7 +103,7 @@ impl Indexed {
 
     fn sift_down(&mut self, mut pos: usize) {
         let len: usize = self.heap.len();
-        let node_value: f32 = self.heap[pos].0;
+        let node_value: f64 = self.heap[pos].0;
         let node_idx: usize = self.heap[pos].1;
 
         loop {
@@ -136,13 +136,13 @@ impl Indexed {
 #[pyfunction]
 pub fn move_median<'py>(
     py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
+    array: PyReadonlyArray2<'py, f64>,
     length: usize,
     min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
+) -> PyResult<Py<PyArray2<f64>>> {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
@@ -153,11 +153,11 @@ pub fn move_median<'py>(
             .for_each(|(input_col, output_col)| {
                 let mut small_heap = Indexed::new(length, num_rows, true);
                 let mut large_heap = Indexed::new(length, num_rows, false);
-                let mut window_q: VecDeque<(f32, usize)> = VecDeque::with_capacity(length + 1);
+                let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
                 let mut valid_count: usize = 0;
 
                 for row in 0..num_rows {
-                    let current_val: f32 = input_col[row];
+                    let current_val: f64 = input_col[row];
 
                     window_q.push_back((current_val, row));
 
@@ -204,8 +204,8 @@ pub fn move_median<'py>(
                                 output_col[row] = val;
                             }
                         } else if !small_heap.is_empty() {
-                            let s_val: f32 = small_heap.peek().unwrap().0;
-                            let l_val: f32 = large_heap.peek().unwrap().0;
+                            let s_val: f64 = small_heap.peek().unwrap().0;
+                            let l_val: f64 = large_heap.peek().unwrap().0;
                             output_col[row] = (s_val + l_val) / 2.0;
                         }
                     }
@@ -220,11 +220,11 @@ pub fn move_median<'py>(
 #[pyfunction]
 pub fn agg_median<'py>(
     py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>
-) -> PyResult<Py<PyArray2<f32>>> {
+    array: PyReadonlyArray2<'py, f64>
+) -> PyResult<Py<PyArray2<f64>>> {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f32>::from_elem((num_rows, num_cols), f32::NAN);
+    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
@@ -233,7 +233,7 @@ pub fn agg_median<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                let mut values: Vec<f32> = Vec::new();
+                let mut values: Vec<f64> = Vec::new();
                 for &row in input_col.iter() {
                     if !row.is_nan() {
                         values.push(row);
@@ -243,7 +243,7 @@ pub fn agg_median<'py>(
                 if !values.is_empty() {
                     values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     let len: usize = values.len();
-                    let median: f32 = if len % 2 == 0 {
+                    let median: f64 = if len % 2 == 0 {
                         (values[len / 2 - 1] + values[len / 2]) / 2.0
                     } else {
                         values[len / 2]

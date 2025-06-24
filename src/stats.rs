@@ -1,6 +1,7 @@
 #[inline(always)]
 pub fn mean(mean_sum: f64, observation_count: usize) -> f64 {
-    mean_sum / (observation_count as f64)
+    let obs: f64 = observation_count as f64;
+    mean_sum / obs
 }
 #[inline(always)]
 pub fn var(mean_sum: f64, mean_square_sum: f64, observation_count: usize) -> f64 {
@@ -59,12 +60,9 @@ pub fn kurtosis(
 }
 
 #[inline(always)]
-pub fn rank(greater_count: usize, equal_count: usize, valid_count: usize) -> f32 {
-    if valid_count == 1 {
-        0.0
-    } else {
-        let raw_rank: f32 = 0.5 * ((greater_count + equal_count - 1) as f32);
-        let normalized_rank: f32 = 2.0 * (raw_rank / ((valid_count - 1) as f32) - 0.5);
-        normalized_rank
-    }
+pub fn rank(greater_count: usize, equal_count: usize, observation_count: usize) -> f64 {
+    let obs: f64 = observation_count as f64;
+    let raw_rank: f64 = (greater_count + equal_count - 1) as f64;
+    let normalized_rank: f64 = 2.0 * ((0.5 * raw_rank) / (obs - 1.0) - 0.5);
+    normalized_rank
 }

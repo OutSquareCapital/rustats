@@ -7,12 +7,12 @@ pub trait StatCalculator {
     fn new() -> Self::State;
     fn add_value(state: &mut Self::State, value: f64);
     fn remove_value(state: &mut Self::State, value: f64);
-    fn get(state: &Self::State, count: usize) -> f32;
+    fn get(state: &Self::State, count: usize) -> f64;
 }
 
 pub trait DequeStatCalculator {
-    fn new() -> VecDeque<(f32, usize)>;
-    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize);
+    fn new() -> VecDeque<(f64, usize)>;
+    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize);
 }
 pub struct Sum;
 impl StatCalculator for Sum {
@@ -27,8 +27,8 @@ impl StatCalculator for Sum {
     fn remove_value(state: &mut Self::State, value: f64) {
         *state -= value;
     }
-    fn get(state: &Self::State, _count: usize) -> f32 {
-        *state as f32
+    fn get(state: &Self::State, _count: usize) -> f64 {
+        *state
     }
 }
 
@@ -45,8 +45,8 @@ impl StatCalculator for Mean {
     fn remove_value(state: &mut Self::State, value: f64) {
         *state -= value;
     }
-    fn get(state: &Self::State, count: usize) -> f32 {
-        stats::mean(*state, count) as f32
+    fn get(state: &Self::State, count: usize) -> f64 {
+        stats::mean(*state, count)
     }
 }
 pub struct Var;
@@ -64,8 +64,8 @@ impl StatCalculator for Var {
         state.0 -= value;
         state.1 -= value.powi(2);
     }
-    fn get(state: &Self::State, count: usize) -> f32 {
-        stats::var(state.0, state.1, count) as f32
+    fn get(state: &Self::State, count: usize) -> f64 {
+        stats::var(state.0, state.1, count)
     }
 }
 
@@ -84,8 +84,8 @@ impl StatCalculator for Stdev {
         state.0 -= value;
         state.1 -= value.powi(2);
     }
-    fn get(state: &Self::State, count: usize) -> f32 {
-        stats::stdev(state.0, state.1, count) as f32
+    fn get(state: &Self::State, count: usize) -> f64 {
+        stats::stdev(state.0, state.1, count)
     }
 }
 
@@ -114,8 +114,8 @@ impl StatCalculator for Skewness {
         state.3 = total - state.2 - temp;
         state.2 = total;
     }
-    fn get(state: &Self::State, count: usize) -> f32 {
-        stats::skew(state.0, state.1, state.2, count) as f32
+    fn get(state: &Self::State, count: usize) -> f64 {
+        stats::skew(state.0, state.1, state.2, count)
     }
 }
 pub struct Kurtosis;
@@ -153,18 +153,18 @@ impl StatCalculator for Kurtosis {
         state.5 = total - state.4 - temp;
         state.4 = total;
     }
-    fn get(state: &Self::State, count: usize) -> f32 {
-        stats::kurtosis(state.0, state.1, state.2, state.4, count) as f32
+    fn get(state: &Self::State, count: usize) -> f64 {
+        stats::kurtosis(state.0, state.1, state.2, state.4, count)
     }
 }
 
 pub struct Min;
 impl DequeStatCalculator for Min {
-    fn new() -> VecDeque<(f32, usize)> {
+    fn new() -> VecDeque<(f64, usize)> {
         VecDeque::new()
     }
 
-    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize) {
+    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
             if val > value {
                 deque.pop_back();
@@ -178,11 +178,11 @@ impl DequeStatCalculator for Min {
 
 pub struct Max;
 impl DequeStatCalculator for Max {
-    fn new() -> VecDeque<(f32, usize)> {
+    fn new() -> VecDeque<(f64, usize)> {
         VecDeque::new()
     }
 
-    fn add_with_index(deque: &mut VecDeque<(f32, usize)>, value: f32, idx: usize) {
+    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
             if val < value {
                 deque.pop_back();
@@ -208,7 +208,7 @@ impl Rank {
         }
     }
 
-    pub fn add(&mut self, other: f32, current: f32) {
+    pub fn add(&mut self, other: f64, current: f64) {
         if other.is_nan() {
             return;
         }
@@ -220,7 +220,7 @@ impl Rank {
         }
     }
 
-    pub fn get(&self) -> f32 {
+    pub fn get(&self) -> f64 {
         stats::rank(self.greater_count, self.equal_count, self.valid_count)
     }
 }
