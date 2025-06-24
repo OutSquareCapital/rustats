@@ -36,6 +36,3 @@ def move_kurtosis_parallel(
 def move_rank(
     array: NDArray[np.float32], length: int, min_length: int
 ) -> NDArray[np.float32]: ...
-def move_max_test(
-    array: NDArray[np.float32], length: int, min_length: int
-) -> NDArray[np.float32]: ...

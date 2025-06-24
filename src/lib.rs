@@ -109,16 +109,6 @@ fn move_max<'py>(
 }
 
 #[pyfunction]
-fn move_max_test<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f32>,
-    length: usize,
-    min_length: usize
-) -> PyResult<Py<PyArray2<f32>>> {
-    templates::move_deque_parallel_test::<calculators::Max>(py, array, length, min_length)
-}
-
-#[pyfunction]
 fn move_median<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f32>,
@@ -288,6 +278,5 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis_parallel, module)?)?;
     module.add_function(wrap_pyfunction!(move_rank, module)?)?;
-    module.add_function(wrap_pyfunction!(move_max_test, module)?)?;
     Ok(())
 }
