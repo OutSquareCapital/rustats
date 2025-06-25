@@ -103,6 +103,11 @@ fn move_parallel<Stat: calculators::StatCalculator>(
             let mut state = Stat::new();
             let mut window = WindowState::new();
 
+            // do dumb work to keep the func busy for testing purposes
+            for _ in 0..2000 {
+                let _ = input_col.iter().map(|&x| x * 2.0).collect::<Vec<_>>();
+            }
+
             for row in 0..length {
                 window.current = input_col[row];
                 if !window.current.is_nan() {
