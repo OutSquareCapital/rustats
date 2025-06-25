@@ -212,6 +212,11 @@ fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
                         window.observations += 1;
                         Stat::add_with_index(&mut deque, window.current, row);
                     }
+                    if window.observations >= min_length {
+                        if let Some(&(val, _)) = deque.front() {
+                            output_col[row] = val;
+                        }
+                    }
                 }
 
                 for row in length..num_rows {
@@ -263,6 +268,11 @@ fn move_deque_single<Stat: calculators::DequeStatCalculator>(
                 if !window.current.is_nan() {
                     window.observations += 1;
                     Stat::add_with_index(&mut deque, window.current, row);
+                }
+                if window.observations >= min_length {
+                    if let Some(&(val, _)) = deque.front() {
+                        output_col[row] = val;
+                    }
                 }
             }
 

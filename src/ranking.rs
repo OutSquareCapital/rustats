@@ -38,7 +38,7 @@ fn move_rank_parallel<'py>(
             .into_par_iter()
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
-                for row in min_length..length {
+                for row in min_length - 1..length {
                     let current: f64 = input_col[row];
                     if current.is_nan() {
                         continue;
@@ -89,7 +89,7 @@ fn move_rank_single<'py>(
 
     py.allow_threads(move || {
         for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
-            for row in min_length..length {
+            for row in min_length - 1..length {
                 let current: f64 = input_col[row];
                 if current.is_nan() {
                     continue;

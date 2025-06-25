@@ -211,7 +211,7 @@ fn move_median_parallel<'py>(
                             small_heap.push(val, idx);
                         }
                     }
-                    if window_q.len() >= length && valid_count >= min_length {
+                    if valid_count >= min_length {
                         if small_heap.len() > large_heap.len() {
                             if let Some((val, _)) = small_heap.peek() {
                                 output_col[row] = val;
@@ -290,7 +290,7 @@ fn move_median_single<'py>(
                         small_heap.push(val, idx);
                     }
                 }
-                if window_q.len() >= length && valid_count >= min_length {
+                if valid_count >= min_length {
                     if small_heap.len() > large_heap.len() {
                         if let Some((val, _)) = small_heap.peek() {
                             output_col[row] = val;
