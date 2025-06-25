@@ -96,47 +96,42 @@ fn move_parallel<Stat: calculators::StatCalculator>(
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
     py.allow_threads(move || {
-    input_columns
-        .into_par_iter()
-        .zip(output_columns.par_iter_mut())
-        .for_each(|(input_col, output_col)| {
-            let mut state = Stat::new();
-            let mut window = WindowState::new();
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                let mut state = Stat::new();
+                let mut window = WindowState::new();
 
-            // do dumb work to keep the func busy for testing purposes
-            for _ in 0..2000 {
-                let _ = input_col.iter().map(|&x| x * 2.0).collect::<Vec<_>>();
-            }
+                for row in 0..length {
+                    window.current = input_col[row];
+                    if !window.current.is_nan() {
+                        window.observations += 1;
+                        Stat::add_value(&mut state, window.current);
+                    }
 
-            for row in 0..length {
-                window.current = input_col[row];
-                if !window.current.is_nan() {
-                    window.observations += 1;
-                    Stat::add_value(&mut state, window.current);
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
                 }
 
-                if window.observations >= min_length {
-                    output_col[row] = Stat::get(&state, window.observations);
-                }
-            }
+                for row in length..num_rows {
+                    window.refresh(&input_col, row, length);
+                    if !window.current.is_nan() {
+                        window.observations += 1;
+                        Stat::add_value(&mut state, window.current);
+                    }
 
-            for row in length..num_rows {
-                window.refresh(&input_col, row, length);
-                if !window.current.is_nan() {
-                    window.observations += 1;
-                    Stat::add_value(&mut state, window.current);
-                }
+                    if !window.precedent.is_nan() {
+                        window.observations -= 1;
+                        Stat::remove_value(&mut state, window.precedent);
+                    }
 
-                if !window.precedent.is_nan() {
-                    window.observations -= 1;
-                    Stat::remove_value(&mut state, window.precedent);
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
                 }
-
-                if window.observations >= min_length {
-                    output_col[row] = Stat::get(&state, window.observations);
-                }
-            }
-        });
+            });
     });
     Ok(output.into_pyarray(py).into())
 }
