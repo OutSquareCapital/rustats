@@ -1,0 +1,25 @@
+[project]
+name = "tests"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bn-typed",
+    "bottleneck>=1.4.0",
+    "nbg-typed",
+    "numbagg>=0.2.2",
+    "numpy>=1.24.4",
+    "pandas>=2.3.0",
+    "plotly>=6.1.2",
+    "plotly-stubs>=0.0.5",
+    "polars>=1.8.2",
+    "pyarrow>=20.0.0",
+    "rustats",
+    "tqdm>=4.67.1",
+]
+
+[tool.uv.sources]
+rustats = { git = "https://github.com/OutSquareCapital/rustats.git" }
+bn-typed = { git = "https://github.com/OutSquareCapital/bn-typed.git" }
+nbg-typed = { git = "https://github.com/OutSquareCapital/nbg-typed.git" }
