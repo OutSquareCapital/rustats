@@ -31,15 +31,15 @@ class Library(StrEnum):
 
 
 COLORS: dict[Library, str] = {
-    Library.RUSTATS: "orange",
+    Library.RUSTATS: "yellow",
     Library.RUSTATS_PARALLEL: "red",
-    Library.NUMBAGG: "blue",
+    Library.NUMBAGG: "cyan",
     Library.BOTTLENECK: "lime",
 }
 
 COLORS_BENCH: dict[Library, str] = {
     Library.BN_BENCH: "lime",
-    Library.NBG_BENCH: "blue",
+    Library.NBG_BENCH: "cyan",
 }
 
 StatType = Literal[

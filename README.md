@@ -35,7 +35,7 @@ Ensure you select the rigth .venv.
 & C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for testing
 ````
 
-![alt text](docs/image.png)
+![alt text](docs/environnements.png)
 
 - First one is for maturin, you don't care very much about it
 - Always select the second one
@@ -44,12 +44,11 @@ Ensure you have 2 powershell terminals, one in rustats, the other in rustats\tes
 
 ![alt text](docs/terminals.png)
 
-When testing, you will be asked to prompt: 
-- the group you want to test
-- the optionnal results exactitude check
-- the benchmark time target.
+When testing, you'll be able to choose wether launching a global test, or a benchmark for a specific group. 
 
-Once the test is run, you can check the stats and results correctness against benchmarks (bottleneck and numbagg).
+You can specify a time duration target (for quick tests flexibility), wether it's a global or specific test. 
+
+The number of functions call will be adjusted accordingly
 
 Currently the distribution plots are filtered to exclude +95th percentile times.
 
@@ -57,29 +56,41 @@ Currently the distribution plots are filtered to exclude +95th percentile times.
 
 ````
 (tests) PS C:\Users\tibo\python_codes\rustats\tests> python main.py
-enter the group to test: median
-write 'y' if you want to check the results of this group, press enter to skip:y
+
+--- Menu ---
+1. Perform a global performance test for all groups
+2. Test performance for a specific group
+3. Check results for a specific group
+4. Exit
+Enter your choice (1-4): 2
+Enter the group to test: median
 write the time target in seconds, press enter for 20 seconds default:
-Timing median - rustats_parallel: 100%|███████████| 2085/2085 [00:20<00:00, 102.90it/s]
+Timing median - rustats_parallel: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████| 2094/2094 [00:20<00:00, 103.49it/s]
 ````
 
 #### Output
 
 ##### Checking exactitude
 
-![alt text](docs/image-4.png)
 
 ##### Boxplot performance comparison
 
-![alt text](docs/image-3.png)
+![alt text](docs/box_bench.png)
 
 ##### Violins performance comparison
 
-![alt text](docs/image-5.png)
+![alt text](docs/violin_bench.png)
 
 #### Visualizing each iteration time
 
 ![alt text](docs/iterations_times.png)
+
+#### With global test
+
+![alt text](docs/global_hist.png)
+![alt text](docs/benchmarks.png)
+
+### Saved data
 
 You can check in tests\benchmark_summary.ndjson what was the actual nb of passes for the last run (WIP)
 
