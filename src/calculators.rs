@@ -29,6 +29,38 @@ impl WindowState {
         self.precedent_idx = row - length;
         self.precedent = input_col[self.precedent_idx];
     }
+    #[inline(always)]
+    pub fn compute_row<Calculator: StatCalculator>(&mut self, state: &mut Calculator::State) {
+        if !self.current.is_nan() {
+            self.observations += 1;
+            Calculator::add_value(state, self.current);
+        }
+
+        if !self.precedent.is_nan() {
+            self.observations -= 1;
+            Calculator::remove_value(state, self.precedent);
+        }
+    }
+    #[inline(always)]
+    pub fn compute_deque_row<Calculator: DequeStatCalculator>(
+        &mut self,
+        deque: &mut VecDeque<(f64, usize)>,
+        row: usize
+    ) {
+        if !self.precedent.is_nan() {
+            self.observations -= 1;
+            if let Some(&(_, front_idx)) = deque.front() {
+                if front_idx == self.precedent_idx {
+                    deque.pop_front();
+                }
+            }
+        }
+
+        if !self.current.is_nan() {
+            self.observations += 1;
+            Calculator::add_with_index(deque, self.current, row);
+        }
+    }
 }
 
 pub trait StatCalculator {

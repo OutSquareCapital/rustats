@@ -89,16 +89,7 @@ fn move_parallel<Stat: calculators::StatCalculator>(
 
                 for row in length..num_rows {
                     window.refresh(&input_col, row, length);
-                    if !window.current.is_nan() {
-                        window.observations += 1;
-                        Stat::add_value(&mut state, window.current);
-                    }
-
-                    if !window.precedent.is_nan() {
-                        window.observations -= 1;
-                        Stat::remove_value(&mut state, window.precedent);
-                    }
-
+                    window.compute_row::<Stat>(&mut state);
                     if window.observations >= min_length {
                         output_col[row] = Stat::get(&state, window.observations);
                     }
@@ -139,15 +130,7 @@ fn move_single<Stat: calculators::StatCalculator>(
 
             for row in length..num_rows {
                 window.refresh(&input_col, row, length);
-                if !window.current.is_nan() {
-                    window.observations += 1;
-                    Stat::add_value(&mut state, window.current);
-                }
-
-                if !window.precedent.is_nan() {
-                    window.observations -= 1;
-                    Stat::remove_value(&mut state, window.precedent);
-                }
+                window.compute_row::<Stat>(&mut state);
                 if window.observations >= min_length {
                     output_col[row] = Stat::get(&state, window.observations);
                 }
@@ -193,19 +176,7 @@ fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
 
                 for row in length..num_rows {
                     window.refresh(&input_col, row, length);
-                    if !window.precedent.is_nan() {
-                        window.observations -= 1;
-                        if let Some(&(_, front_idx)) = deque.front() {
-                            if front_idx == window.precedent_idx {
-                                deque.pop_front();
-                            }
-                        }
-                    }
-
-                    if !window.current.is_nan() {
-                        window.observations += 1;
-                        Stat::add_with_index(&mut deque, window.current, row);
-                    }
+                    window.compute_deque_row::<Stat>(&mut deque, row);
                     if window.observations >= min_length {
                         if let Some(&(val, _)) = deque.front() {
                             output_col[row] = val;
@@ -250,19 +221,7 @@ fn move_deque_single<Stat: calculators::DequeStatCalculator>(
 
             for row in length..num_rows {
                 window.refresh(&input_col, row, length);
-                if !window.precedent.is_nan() {
-                    window.observations -= 1;
-                    if let Some(&(_, front_idx)) = deque.front() {
-                        if front_idx == window.precedent_idx {
-                            deque.pop_front();
-                        }
-                    }
-                }
-                if !window.current.is_nan() {
-                    window.observations += 1;
-                    Stat::add_with_index(&mut deque, window.current, row);
-                }
-
+                window.compute_deque_row::<Stat>(&mut deque, row);
                 if window.observations >= min_length {
                     if let Some(&(val, _)) = deque.front() {
                         output_col[row] = val;
