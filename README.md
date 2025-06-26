@@ -12,6 +12,8 @@ Build with
 
 ````
 $env:CARGO_PROFILE_RELEASE_OPT_LEVEL="3"
+$env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1"
+$env:CARGO_PROFILE_RELEASE_LTO = "fat"
 $env:RUSTFLAGS="--cfg pyo3_disable_reference_pool"
 maturin build --release
 ````
