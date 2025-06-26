@@ -5,7 +5,7 @@ requires-python = ">=3.13"
 [[package]]
 name = "bn-typed"
 version = "0.1.4"
-source = { git = "https://github.com/OutSquareCapital/bn-typed.git#d138cb2cf0fe998f79449349e124c75ec0510d91" }
+source = { git = "https://github.com/OutSquareCapital/bn-typed.git#7d060a015fa2bd756dec337e0ca794ad196fd296" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -253,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "rustats"
-version = "0.1.306"
-source = { git = "https://github.com/OutSquareCapital/rustats.git#4732c6774d865aeead0a7f2c918848baac857fcb" }
+version = "0.1.307"
+source = { git = "https://github.com/OutSquareCapital/rustats.git#d3bb5b3836e61d54aeec4ee44bd514ac061a5ac7" }
 dependencies = [
     { name = "numpy" },
 ]

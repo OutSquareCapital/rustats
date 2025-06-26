@@ -42,7 +42,7 @@ StatType = Literal[
     "std",  # 🦀 ✅
     "max",  # 🦀 ✅
     "min",  # 🦀 ✅
-    "median",  # 🦀 ✅ # TODO: test parallel opti, current 3.25 - 3.40 ms
+    "median",  # 🦀 ✅
     "rank",  # 🦀 ✅
 ]
 
@@ -74,7 +74,8 @@ class FuncGroup:
     def warmup(self):
         arr: NDArray[np.float64] = np.random.rand(1000, 10).astype(np.float64)
         for func in self.funcs:
-            func(arr)
+            for _ in range(10):
+                func(arr)
 
     def time_group(
         self,
@@ -83,16 +84,20 @@ class FuncGroup:
         n_passes: int,
     ) -> list[Result]:
         results: list[Result] = []
-        for func in tqdm(self.funcs):
-            for _ in range(n_passes):
-                start_time: float = perf_counter()
-                func(arr=arr)
-                elapsed_time: float = (perf_counter() - start_time) * 1000
-                results.append(
-                    Result(
-                        library=func.library,
-                        group=group_name,
-                        time=elapsed_time,
+        total: int = len(self.funcs) * n_passes
+        with tqdm(total=total) as pbar:
+            for func in self.funcs:
+                pbar.set_description(f"Timing {group_name} - {func.library}")
+                for _ in range(n_passes):
+                    start_time: float = perf_counter()
+                    func(arr=arr)
+                    elapsed_time: float = (perf_counter() - start_time) * 1000
+                    results.append(
+                        Result(
+                            library=func.library,
+                            group=group_name,
+                            time=elapsed_time,
+                        )
                     )
-                )
+                    pbar.update(1)
         return results

@@ -76,6 +76,7 @@ def plot_benchmark_results(
         group_name=group_name,
         target_time_secs=time_target,
     )
+
     plot_group_result(
         avg_data=data,
         group_name=group_name,
