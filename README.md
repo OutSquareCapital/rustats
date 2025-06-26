@@ -28,10 +28,11 @@ Then, update the version of the testing folder with
 rustats\tests> uv sync --upgrade
 ````
 
-Ensure you select the rigth .venv (rustats\tests) for testing.
+Ensure you select the rigth .venv.
 
 ````
-& C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1
+& C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for compiling
+& C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for testing
 ````
 
 ![alt text](docs/image.png)

@@ -162,7 +162,50 @@ fn move_median_parallel<'py>(
                 let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
                 let mut valid_count: usize = 0;
 
-                for row in 0..num_rows {
+                for row in 0..length {
+                    let current_val: f64 = input_col[row];
+
+                    window_q.push_back((current_val, row));
+
+                    if !current_val.is_nan() {
+                        valid_count += 1;
+
+                        if let Some((max_small, _)) = small_heap.peek() {
+                            if current_val > max_small {
+                                large_heap.push(current_val, row);
+                            } else {
+                                small_heap.push(current_val, row);
+                            }
+                        } else {
+                            small_heap.push(current_val, row);
+                        }
+                    }
+
+                    while small_heap.heap.len() > large_heap.heap.len() + 1 {
+                        if let Some((val, idx)) = small_heap.pop() {
+                            large_heap.push(val, idx);
+                        }
+                    }
+
+                    while large_heap.heap.len() > small_heap.heap.len() {
+                        if let Some((val, idx)) = large_heap.pop() {
+                            small_heap.push(val, idx);
+                        }
+                    }
+                    if valid_count >= min_length {
+                        if small_heap.heap.len() > large_heap.heap.len() {
+                            if let Some((val, _)) = small_heap.peek() {
+                                output_col[row] = val;
+                            }
+                        } else if !small_heap.heap.is_empty() {
+                            let s_val: f64 = small_heap.peek().unwrap().0;
+                            let l_val: f64 = large_heap.peek().unwrap().0;
+                            output_col[row] = (s_val + l_val) / 2.0;
+                        }
+                    }
+                }
+
+                for row in length..num_rows {
                     let current_val: f64 = input_col[row];
 
                     window_q.push_back((current_val, row));
@@ -283,8 +326,6 @@ fn move_median_single<'py>(
                     }
                 }
             }
-
-
 
             for row in length..num_rows {
                 let current_val: f64 = input_col[row];
