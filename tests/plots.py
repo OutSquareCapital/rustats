@@ -39,7 +39,16 @@ def plot_group_result(
     group_name: StatType,
     kind: Literal["box", "violins"],
     log_y: bool,
+    limit: int,
 ) -> None:
+    quantile_limit = limit / 100
+    avg_data = avg_data.join(
+        avg_data.group_by("Library").agg(
+            pl.col("Time (ms)").quantile(quantile_limit).alias("limit")
+        ),
+        on="Library",
+    ).filter(pl.col("Time (ms)") <= pl.col("limit"))
+
     if kind == "box":
         px.box(  # type: ignore
             avg_data.to_pandas(),
@@ -70,6 +79,7 @@ def plot_benchmark_results(
     group_name: StatType,
     time_target: int,
     log_y: bool,
+    limit: int,
 ) -> None:
     data: pl.DataFrame = manager.get_perf_for_group(
         array=array,
@@ -82,10 +92,12 @@ def plot_benchmark_results(
         group_name=group_name,
         kind="box",
         log_y=log_y,
+        limit=limit,
     )
     plot_group_result(
         avg_data=data,
         group_name=group_name,
         kind="violins",
         log_y=log_y,
+        limit=limit,
     )
