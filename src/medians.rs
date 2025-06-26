@@ -3,7 +3,6 @@ use numpy::{ PyArray2, PyReadonlyArray2 };
 use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use rayon::prelude::*;
-use std::cmp::Ordering;
 use crate::calculators;
 
 #[pyfunction]
@@ -382,47 +381,6 @@ fn move_median_single<'py>(
                 }
             }
         }
-    });
-
-    Ok(PyArray2::from_owned_array(py, output).into())
-}
-
-#[pyfunction]
-pub fn agg_median<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>
-) -> PyResult<Py<PyArray2<f64>>> {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                let mut values: Vec<f64> = Vec::new();
-                for &row in input_col.iter() {
-                    if !row.is_nan() {
-                        values.push(row);
-                    }
-                }
-
-                if !values.is_empty() {
-                    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-                    let len: usize = values.len();
-                    let median: f64 = if len % 2 == 0 {
-                        (values[len / 2 - 1] + values[len / 2]) / 2.0
-                    } else {
-                        values[len / 2]
-                    };
-                    for val in output_col.iter_mut() {
-                        *val = median;
-                    }
-                }
-            });
     });
 
     Ok(PyArray2::from_owned_array(py, output).into())

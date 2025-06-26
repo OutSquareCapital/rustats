@@ -95,75 +95,53 @@ fn move_max<'py>(
 }
 
 #[pyfunction]
-fn agg_sum<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Sum>(py, array, parallel)
+fn agg_sum<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_mean<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Mean>(py, array, parallel)
+fn agg_mean<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_var<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Var>(py, array, parallel)
+fn agg_var<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_std<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Stdev>(py, array, parallel)
+fn agg_std<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_skewness<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Skewness>(py, array, parallel)
+fn agg_skewness<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_kurtosis<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_template::<calculators::Kurtosis>(py, array, parallel)
+fn agg_kurtosis<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_min<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_deque_template::<calculators::Min>(py, array, parallel)
+fn agg_min<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pyfunction]
-fn agg_max<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
-    templates::agg_deque_template::<calculators::Max>(py, array, parallel)
+fn agg_max<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
+}
+
+#[pyfunction]
+pub fn agg_median<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
+}
+
+#[pyfunction]
+pub fn agg_rank<'py>() -> PyResult<Py<PyArray2<f64>>> {
+    todo!()
 }
 
 #[pymodule(name = "rustats")]
@@ -186,7 +164,7 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(agg_min, module)?)?;
     module.add_function(wrap_pyfunction!(agg_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(agg_kurtosis, module)?)?;
-    module.add_function(wrap_pyfunction!(medians::agg_median, module)?)?;
-    module.add_function(wrap_pyfunction!(ranking::agg_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(agg_median, module)?)?;
+    module.add_function(wrap_pyfunction!(agg_rank, module)?)?;
     Ok(())
 }
