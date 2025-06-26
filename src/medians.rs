@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use numpy::ndarray::Array2;
 use rayon::prelude::*;
 use std::cmp::Ordering;
+use crate::calculators;
 
 #[pyfunction]
 pub fn move_median<'py>(
@@ -160,24 +161,24 @@ fn move_median_parallel<'py>(
                 let mut small_heap = Indexed::new(length, num_rows, true);
                 let mut large_heap = Indexed::new(length, num_rows, false);
                 let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
-                let mut valid_count: usize = 0;
+                let mut window = calculators::WindowState::new();
 
                 for row in 0..length {
-                    let current_val: f64 = input_col[row];
+                    window.current = input_col[row];
 
-                    window_q.push_back((current_val, row));
+                    window_q.push_back((window.current, row));
 
-                    if !current_val.is_nan() {
-                        valid_count += 1;
+                    if !window.current.is_nan() {
+                        window.observations += 1;
 
                         if let Some((max_small, _)) = small_heap.peek() {
-                            if current_val > max_small {
-                                large_heap.push(current_val, row);
+                            if window.current > max_small {
+                                large_heap.push(window.current, row);
                             } else {
-                                small_heap.push(current_val, row);
+                                small_heap.push(window.current, row);
                             }
                         } else {
-                            small_heap.push(current_val, row);
+                            small_heap.push(window.current, row);
                         }
                     }
 
@@ -192,7 +193,7 @@ fn move_median_parallel<'py>(
                             small_heap.push(val, idx);
                         }
                     }
-                    if valid_count >= min_length {
+                    if window.observations >= min_length {
                         if small_heap.heap.len() > large_heap.heap.len() {
                             if let Some((val, _)) = small_heap.peek() {
                                 output_col[row] = val;
@@ -206,33 +207,33 @@ fn move_median_parallel<'py>(
                 }
 
                 for row in length..num_rows {
-                    let current_val: f64 = input_col[row];
+                    window.current = input_col[row];
 
-                    window_q.push_back((current_val, row));
+                    window_q.push_back((window.current, row));
 
-                    if !current_val.is_nan() {
-                        valid_count += 1;
+                    if !window.current.is_nan() {
+                        window.observations += 1;
 
                         if let Some((max_small, _)) = small_heap.peek() {
-                            if current_val > max_small {
-                                large_heap.push(current_val, row);
+                            if window.current > max_small {
+                                large_heap.push(window.current, row);
                             } else {
-                                small_heap.push(current_val, row);
+                                small_heap.push(window.current, row);
                             }
                         } else {
-                            small_heap.push(current_val, row);
+                            small_heap.push(window.current, row);
                         }
                     }
 
                     if window_q.len() > length {
-                        let (old_val, old_idx) = window_q.pop_front().unwrap();
+                        (window.precedent, window.precedent_idx) = window_q.pop_front().unwrap();
 
-                        if !old_val.is_nan() {
-                            valid_count -= 1;
+                        if !window.precedent.is_nan() {
+                            window.observations -= 1;
 
-                            if small_heap.remove(old_idx) {
+                            if small_heap.remove(window.precedent_idx) {
                             } else {
-                                large_heap.remove(old_idx);
+                                large_heap.remove(window.precedent_idx);
                             }
                         }
                     }
@@ -247,7 +248,7 @@ fn move_median_parallel<'py>(
                             small_heap.push(val, idx);
                         }
                     }
-                    if valid_count >= min_length {
+                    if window.observations >= min_length {
                         if small_heap.heap.len() > large_heap.heap.len() {
                             if let Some((val, _)) = small_heap.peek() {
                                 output_col[row] = val;
@@ -282,24 +283,24 @@ fn move_median_single<'py>(
             let mut small_heap = Indexed::new(length, num_rows, true);
             let mut large_heap = Indexed::new(length, num_rows, false);
             let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
-            let mut valid_count: usize = 0;
+            let mut window: calculators::WindowState = calculators::WindowState::new();
 
             for row in 0..length {
-                let current_val: f64 = input_col[row];
+                window.current = input_col[row];
 
-                window_q.push_back((current_val, row));
+                window_q.push_back((window.current, row));
 
-                if !current_val.is_nan() {
-                    valid_count += 1;
+                if !window.current.is_nan() {
+                    window.observations += 1;
 
                     if let Some((max_small, _)) = small_heap.peek() {
-                        if current_val > max_small {
-                            large_heap.push(current_val, row);
+                        if window.current > max_small {
+                            large_heap.push(window.current, row);
                         } else {
-                            small_heap.push(current_val, row);
+                            small_heap.push(window.current, row);
                         }
                     } else {
-                        small_heap.push(current_val, row);
+                        small_heap.push(window.current, row);
                     }
                 }
 
@@ -314,7 +315,7 @@ fn move_median_single<'py>(
                         small_heap.push(val, idx);
                     }
                 }
-                if valid_count >= min_length {
+                if window.observations >= min_length {
                     if small_heap.heap.len() > large_heap.heap.len() {
                         if let Some((val, _)) = small_heap.peek() {
                             output_col[row] = val;
@@ -328,32 +329,32 @@ fn move_median_single<'py>(
             }
 
             for row in length..num_rows {
-                let current_val: f64 = input_col[row];
-                window_q.push_back((current_val, row));
+                window.current = input_col[row];
+                window_q.push_back((window.current, row));
 
-                if !current_val.is_nan() {
-                    valid_count += 1;
+                if !window.current.is_nan() {
+                    window.observations += 1;
 
                     if let Some((max_small, _)) = small_heap.peek() {
-                        if current_val > max_small {
-                            large_heap.push(current_val, row);
+                        if window.current > max_small {
+                            large_heap.push(window.current, row);
                         } else {
-                            small_heap.push(current_val, row);
+                            small_heap.push(window.current, row);
                         }
                     } else {
-                        small_heap.push(current_val, row);
+                        small_heap.push(window.current, row);
                     }
                 }
 
                 if window_q.len() > length {
-                    let (old_val, old_idx) = window_q.pop_front().unwrap();
+                    (window.precedent, window.precedent_idx) = window_q.pop_front().unwrap();
 
-                    if !old_val.is_nan() {
-                        valid_count -= 1;
+                    if !window.precedent.is_nan() {
+                        window.observations -= 1;
 
-                        if small_heap.remove(old_idx) {
+                        if small_heap.remove(window.precedent_idx) {
                         } else {
-                            large_heap.remove(old_idx);
+                            large_heap.remove(window.precedent_idx);
                         }
                     }
                 }
@@ -368,7 +369,7 @@ fn move_median_single<'py>(
                         small_heap.push(val, idx);
                     }
                 }
-                if valid_count >= min_length {
+                if window.observations >= min_length {
                     if small_heap.heap.len() > large_heap.heap.len() {
                         if let Some((val, _)) = small_heap.peek() {
                             output_col[row] = val;
