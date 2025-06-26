@@ -18,6 +18,8 @@ $env:RUSTFLAGS="--cfg pyo3_disable_reference_pool"
 maturin build --release
 ````
 
+Cargo profile env variables don't seem to change anything ATM.
+
 Once the project is built and the pyproject version # is updated, commit the changes.
 
 Then, update the version of the testing folder with
