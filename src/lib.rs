@@ -135,12 +135,12 @@ fn agg_max<'py>() -> PyResult<Py<PyArray2<f64>>> {
 }
 
 #[pyfunction]
-pub fn agg_median<'py>() -> PyResult<Py<PyArray2<f64>>> {
+fn agg_median<'py>() -> PyResult<Py<PyArray2<f64>>> {
     todo!()
 }
 
 #[pyfunction]
-pub fn agg_rank<'py>() -> PyResult<Py<PyArray2<f64>>> {
+fn agg_rank<'py>() -> PyResult<Py<PyArray2<f64>>> {
     todo!()
 }
 
