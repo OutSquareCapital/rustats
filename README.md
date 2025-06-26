@@ -11,6 +11,7 @@ uv add git+https://github.com/OutSquareCapital/rustats.git
 Build with
 
 ````
+$env:CARGO_PROFILE_RELEASE_OPT_LEVEL="3"
 $env:RUSTFLAGS="--cfg pyo3_disable_reference_pool"
 maturin build --release
 ````
@@ -23,7 +24,12 @@ Then, update the version of the testing folder with
 rustats\tests> uv sync --upgrade
 ````
 
-Ensure you select the rigt .venv (rustats\tests) for testing.
+Ensure you select the rigth .venv (rustats\tests) for testing.
+
+````
+& rustats/tests/.venv/Scripts/Activate.ps1
+````
+
 
 ![alt text](docs/image.png)
 
