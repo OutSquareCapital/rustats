@@ -1,36 +1,8 @@
 use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray };
 use pyo3::prelude::*;
-use numpy::ndarray::{ Array2, ArrayBase, ViewRepr, Dim };
+use numpy::ndarray::Array2;
 use rayon::prelude::*;
 use crate::calculators;
-struct WindowState {
-    observations: usize,
-    current: f64,
-    precedent: f64,
-    precedent_idx: usize,
-}
-impl WindowState {
-    #[inline(always)]
-    fn new() -> Self {
-        Self {
-            observations: 0,
-            current: f64::NAN,
-            precedent: f64::NAN,
-            precedent_idx: 0,
-        }
-    }
-    #[inline(always)]
-    fn refresh(
-        &mut self,
-        input_col: &ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>,
-        row: usize,
-        length: usize
-    ) {
-        self.current = input_col[row];
-        self.precedent_idx = row - length;
-        self.precedent = input_col[self.precedent_idx];
-    }
-}
 
 pub fn move_template<Stat: calculators::StatCalculator>(
     py: Python<'_>,
@@ -101,7 +73,7 @@ fn move_parallel<Stat: calculators::StatCalculator>(
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
                 let mut state = Stat::new();
-                let mut window = WindowState::new();
+                let mut window = calculators::WindowState::new();
 
                 for row in 0..length {
                     window.current = input_col[row];
@@ -151,7 +123,7 @@ fn move_single<Stat: calculators::StatCalculator>(
     py.allow_threads(move || {
         for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
             let mut state = Stat::new();
-            let mut window = WindowState::new();
+            let mut window = calculators::WindowState::new();
 
             for row in 0..length {
                 window.current = input_col[row];
@@ -204,7 +176,7 @@ fn move_deque_parallel<Stat: calculators::DequeStatCalculator>(
             .zip(output_columns.par_iter_mut())
             .for_each(|(input_col, output_col)| {
                 let mut deque = Stat::new();
-                let mut window = WindowState::new();
+                let mut window = calculators::WindowState::new();
 
                 for row in 0..length {
                     window.current = input_col[row];
@@ -261,7 +233,7 @@ fn move_deque_single<Stat: calculators::DequeStatCalculator>(
     py.allow_threads(move || {
         for (input_col, output_col) in input_columns.into_iter().zip(output_columns.iter_mut()) {
             let mut deque = Stat::new();
-            let mut window = WindowState::new();
+            let mut window = calculators::WindowState::new();
 
             for row in 0..length {
                 window.current = input_col[row];

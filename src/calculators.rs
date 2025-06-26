@@ -1,5 +1,35 @@
 use crate::stats;
 use std::collections::VecDeque;
+use numpy::ndarray::{ ArrayBase, ViewRepr, Dim };
+
+pub struct WindowState {
+    pub observations: usize,
+    pub current: f64,
+    pub precedent: f64,
+    pub precedent_idx: usize,
+}
+impl WindowState {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            observations: 0,
+            current: f64::NAN,
+            precedent: f64::NAN,
+            precedent_idx: 0,
+        }
+    }
+    #[inline(always)]
+    pub fn refresh(
+        &mut self,
+        input_col: &ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>,
+        row: usize,
+        length: usize
+    ) {
+        self.current = input_col[row];
+        self.precedent_idx = row - length;
+        self.precedent = input_col[self.precedent_idx];
+    }
+}
 
 pub trait StatCalculator {
     type State;
