@@ -26,13 +26,20 @@ class Library(StrEnum):
     RUSTATS = auto()
     RUSTATS_PARALLEL = auto()
     NUMBAGG = auto()
+    BN_BENCH = f"{BOTTLENECK} - {RUSTATS}"
+    NBG_BENCH = f"{NUMBAGG} - {RUSTATS_PARALLEL}"
 
 
 COLORS: dict[Library, str] = {
     Library.RUSTATS: "orange",
     Library.RUSTATS_PARALLEL: "red",
     Library.NUMBAGG: "blue",
-    Library.BOTTLENECK: "green",
+    Library.BOTTLENECK: "lime",
+}
+
+COLORS_BENCH: dict[Library, str] = {
+    Library.BN_BENCH: "lime",
+    Library.NBG_BENCH: "blue",
 }
 
 StatType = Literal[
