@@ -108,7 +108,7 @@ impl StatCalculator for Mean {
         *state -= value;
     }
     fn get(state: &Self::State, count: usize) -> f64 {
-        stats::mean(*state, count)
+        *state / (count as f64)
     }
 }
 pub struct Var;
@@ -127,7 +127,7 @@ impl StatCalculator for Var {
         state.1 -= value.powi(2);
     }
     fn get(state: &Self::State, count: usize) -> f64 {
-        stats::var(state.0, state.1, count)
+        stats::var(state.0, state.1, count as f64)
     }
 }
 
@@ -147,7 +147,7 @@ impl StatCalculator for Stdev {
         state.1 -= value.powi(2);
     }
     fn get(state: &Self::State, count: usize) -> f64 {
-        stats::stdev(state.0, state.1, count)
+        stats::stdev(state.0, state.1, count as f64)
     }
 }
 
@@ -177,7 +177,7 @@ impl StatCalculator for Skewness {
         state.2 = total;
     }
     fn get(state: &Self::State, count: usize) -> f64 {
-        stats::skew(state.0, state.1, state.2, count)
+        stats::skew(state.0, state.1, state.2, count as f64)
     }
 }
 pub struct Kurtosis;
@@ -216,7 +216,7 @@ impl StatCalculator for Kurtosis {
         state.4 = total;
     }
     fn get(state: &Self::State, count: usize) -> f64 {
-        stats::kurtosis(state.0, state.1, state.2, state.4, count)
+        stats::kurtosis(state.0, state.1, state.2, state.4, count as f64)
     }
 }
 
@@ -283,6 +283,6 @@ impl Rank {
     }
 
     pub fn get(&self) -> f64 {
-        stats::rank(self.greater_count, self.equal_count, self.valid_count)
+        stats::rank(self.greater_count, self.equal_count, self.valid_count as f64)
     }
 }
