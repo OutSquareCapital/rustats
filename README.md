@@ -18,7 +18,7 @@ $env:RUSTFLAGS="--cfg pyo3_disable_reference_pool"
 maturin build --release
 ````
 
-Cargo profile env variables don't seem to change anything ATM.
+Cargo profile env variables don't seem to change anything ATM, but are indeed taken into account for compilation.
 
 Once the project is built and the pyproject version # is updated, commit the changes.
 
@@ -44,13 +44,24 @@ Ensure you have 2 powershell terminals, one in rustats, the other in rustats\tes
 
 ![alt text](docs/terminals.png)
 
-When testing, you will be prompted the group you want to test and the time target.
+When testing, you will be asked to prompt: 
+- the group you want to test
+- the optionnal results exactitude check
+- the benchmark time target.
 
 Once the test is run, you can check the stats and results correctness against benchmarks (bottleneck and numbagg).
 
+Currently the distribution plots are filtered to exclude +95th percentile times.
+
 ### Example
 
-![alt text](docs/test_prompt.png)
+````
+(tests) PS C:\Users\tibo\python_codes\rustats\tests> python main.py
+enter the group to test: median
+write 'y' if you want to check the results of this group, press enter to skip:y
+write the time target in seconds, press enter for 20 seconds default:
+Timing median - rustats_parallel: 100%|███████████| 2085/2085 [00:20<00:00, 102.90it/s]
+````
 
 #### Output
 
@@ -65,6 +76,10 @@ Once the test is run, you can check the stats and results correctness against be
 ##### Violins performance comparison
 
 ![alt text](docs/image-5.png)
+
+#### Visualizing each iteration time
+
+![alt text](docs/iterations_times.png)
 
 You can check in tests\benchmark_summary.ndjson what was the actual nb of passes for the last run (WIP)
 

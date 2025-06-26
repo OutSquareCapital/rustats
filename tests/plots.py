@@ -37,40 +37,54 @@ def plot_function_results(
 def plot_group_result(
     avg_data: pl.DataFrame,
     group_name: StatType,
-    kind: Literal["box", "violins"],
+    kind: Literal["box", "violins", "line"],
     log_y: bool,
     limit: int,
 ) -> None:
     quantile_limit = limit / 100
-    avg_data = avg_data.join(
+    distribution_data = avg_data.join(
         avg_data.group_by("Library").agg(
             pl.col("Time (ms)").quantile(quantile_limit).alias("limit")
         ),
         on="Library",
     ).filter(pl.col("Time (ms)") <= pl.col("limit"))
-
-    if kind == "box":
-        px.box(  # type: ignore
-            avg_data.to_pandas(),
-            y="Time (ms)",
-            color="Library",
-            points=False,
-            title=f"Performance Comparison - {group_name}",
-            log_y=log_y,
-            template="plotly_dark",
-            color_discrete_map=COLORS,
-        ).show()
-    else:
-        px.violin(  # type: ignore
-            avg_data.to_pandas(),
-            y="Time (ms)",
-            color="Library",
-            title=f"Performance Comparison - {group_name}",
-            log_y=log_y,
-            violinmode="overlay",
-            template="plotly_dark",
-            color_discrete_map=COLORS,
-        ).show()
+    line_data = avg_data.with_columns(
+        pl.arange(0, avg_data.height, 1).alias("Iteration")
+    )
+    match kind:
+        case "box":
+            px.box(  # type: ignore
+                distribution_data.to_pandas(),
+                y="Time (ms)",
+                color="Library",
+                points=False,
+                title=f"Performance Comparison - {group_name}",
+                log_y=log_y,
+                template="plotly_dark",
+                color_discrete_map=COLORS,
+            ).show()
+        case "violins":
+            px.violin(  # type: ignore
+                distribution_data.to_pandas(),
+                y="Time (ms)",
+                color="Library",
+                title=f"Performance Comparison - {group_name}",
+                log_y=log_y,
+                violinmode="overlay",
+                template="plotly_dark",
+                color_discrete_map=COLORS,
+            ).show()
+        case "line":
+            px.line(  # type: ignore
+                line_data.to_pandas(),
+                x="Iteration",
+                y="Time (ms)",
+                color="Library",
+                title=f"Performance Comparison - {group_name} (Line Plot)",
+                log_y=log_y,
+                template="plotly_dark",
+                color_discrete_map=COLORS,
+            ).show()
 
 
 def plot_benchmark_results(
@@ -98,6 +112,14 @@ def plot_benchmark_results(
         avg_data=data,
         group_name=group_name,
         kind="violins",
+        log_y=log_y,
+        limit=limit,
+    )
+
+    plot_group_result(
+        avg_data=data,
+        group_name=group_name,
+        kind="line",
         log_y=log_y,
         limit=limit,
     )
