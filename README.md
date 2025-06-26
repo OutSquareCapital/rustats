@@ -29,9 +29,8 @@ rustats\tests> uv sync --upgrade
 Ensure you select the rigth .venv (rustats\tests) for testing.
 
 ````
-& rustats/tests/.venv/Scripts/Activate.ps1
+& C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1
 ````
-
 
 ![alt text](docs/image.png)
 
