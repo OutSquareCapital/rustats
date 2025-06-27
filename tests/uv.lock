@@ -253,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "rustats"
-version = "0.1.313"
-source = { git = "https://github.com/OutSquareCapital/rustats.git#b0b89b404da97f44a7271247e4d17f4dfb0ff5b7" }
+version = "0.1.314"
+source = { git = "https://github.com/OutSquareCapital/rustats.git#a7d11faa6c238d125ae00a0711e89a379572def0" }
 dependencies = [
     { name = "numpy" },
 ]

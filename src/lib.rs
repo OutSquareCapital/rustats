@@ -1,10 +1,8 @@
 use numpy::{ PyArray2, PyReadonlyArray2 };
 use pyo3::prelude::*;
 mod stats;
-mod medians;
 mod calculators;
 mod templates;
-mod ranking;
 
 #[pyfunction]
 fn move_sum<'py>(
@@ -152,10 +150,10 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_mean, module)?)?;
     module.add_function(wrap_pyfunction!(move_max, module)?)?;
     module.add_function(wrap_pyfunction!(move_min, module)?)?;
-    module.add_function(wrap_pyfunction!(medians::move_median, module)?)?;
+    module.add_function(wrap_pyfunction!(templates::move_median, module)?)?;
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
-    module.add_function(wrap_pyfunction!(ranking::move_rank, module)?)?;
+    module.add_function(wrap_pyfunction!(templates::move_rank, module)?)?;
     module.add_function(wrap_pyfunction!(agg_sum, module)?)?;
     module.add_function(wrap_pyfunction!(agg_std, module)?)?;
     module.add_function(wrap_pyfunction!(agg_var, module)?)?;
