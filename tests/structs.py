@@ -1,20 +1,28 @@
 from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum, auto, IntEnum
-from typing import Literal, NamedTuple, Protocol
+from enum import StrEnum, auto
+from typing import Literal, NamedTuple, Protocol, Any
 import numpy as np
+from dataclasses import dataclass
 from numpy.typing import NDArray
 import polars as pl
 
-type Computation = Callable[[NDArray[np.float64]], NDArray[np.float64]]
-type RSFunc = Callable[[NDArray[np.float64], int, int, bool], NDArray[np.float64]]
-type BNFunc = Callable[[NDArray[np.float64], int, int, int], NDArray[np.float64]]
-type NBGFunc = Callable[[NDArray[np.float64], int, int, int], NDArray[np.float64]]
 
+@dataclass(slots=True)
+class BenchmarkConfig:
+    array: NDArray[np.float64]
+    df: pl.DataFrame
+    min_length: int = 25
+    length: int = 250
+    axis: int = 0
+    time_target: int = 20
+    limit: float = 0.95
 
-class Length(IntEnum):
-    MIN = 25
-    FULL = 250
+    def set_time_target(self) -> None:
+        time_input: str = input(
+            "write the time target in seconds, press enter for 20 seconds default>"
+        ).strip()
+        if not time_input == "":
+            self.time_target = int(time_input)
 
 
 class Files(StrEnum):
@@ -30,8 +38,7 @@ class Library(StrEnum):
     NUMBAGG = auto()
     BN_BENCH = f"{BOTTLENECK} - {RUSTATS}"
     NBG_BENCH = f"{NUMBAGG} - {RUSTATS_PARALLEL}"
-    PL_BENCH_SINGLE = f"{POLARS} - {RUSTATS}"
-    PL_BENCH_PARALLEL = f"{POLARS} - {RUSTATS_PARALLEL}"
+    PL_BENCH = f"{POLARS} - {RUSTATS_PARALLEL}"
 
 
 COLORS: dict[Library, str] = {
@@ -45,8 +52,7 @@ COLORS: dict[Library, str] = {
 COLORS_BENCH: dict[Library, str] = {
     Library.BN_BENCH: "lime",
     Library.NBG_BENCH: "cyan",
-    Library.PL_BENCH_SINGLE: "orange",
-    Library.PL_BENCH_PARALLEL: "white",
+    Library.PL_BENCH: "white",
 }
 
 StatType = Literal[
@@ -72,63 +78,62 @@ class Result(NamedTuple):
 class StatFuncProtocol(Protocol):
     library: Library
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]: ...
+    def __call__(self, config: BenchmarkConfig) -> Any: ...
 
 
-class StatFunc[T: Callable[..., NDArray[np.float64]] | pl.Expr]:
+class StatFunc[T: NDArray[np.float64] | pl.DataFrame]:
     library: Library
 
     def __init__(
         self,
-        func: T,
+        func: Callable[..., T],
     ) -> None:
-        self.func: T = func
+        self.func = func
         self.results: list[Result] = []
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]: ...
+    def __call__(self, config: BenchmarkConfig) -> T: ...
 
 
-class BnFunc(StatFunc[BNFunc]):
+class BnFunc(StatFunc[NDArray[np.float64]]):
     library = Library.BOTTLENECK
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
-        return self.func(arr, Length.FULL, Length.MIN, 0)
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(
+            config.array,
+            window=config.length,
+            min_count=config.min_length,
+            axis=config.axis,
+        )
 
 
-class NbgFunc(StatFunc[Computation]):
+class NbgFunc(StatFunc[NDArray[np.float64]]):
     library = Library.NUMBAGG
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
-        return self.func(arr)
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(
+            config.array,
+            window=config.length,
+            min_count=config.min_length,
+            axis=config.axis,
+        )
 
 
-class PlFunc(StatFunc[pl.Expr]):
+class PlFunc(StatFunc[pl.DataFrame]):
     library = Library.POLARS
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
-        return pl.from_numpy(data=arr).select(self.func).to_numpy().astype(np.float64)
+    def __call__(self, config: BenchmarkConfig) -> pl.DataFrame:
+        return self.func(config.df, length=config.length, min_length=config.min_length)
 
 
-class RSingleFunc(StatFunc[RSFunc]):
+class RSingleFunc(StatFunc[NDArray[np.float64]]):
     library = Library.RUSTATS
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
-        return self.func(arr, Length.FULL, Length.MIN, False)
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(config.array, config.length, config.min_length, False)
 
 
-class RParallelFunc(StatFunc[RSFunc]):
+class RParallelFunc(StatFunc[NDArray[np.float64]]):
     library = Library.RUSTATS_PARALLEL
 
-    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
-        return self.func(arr, Length.FULL, Length.MIN, True)
-
-
-@dataclass(slots=True)
-class FuncGroup:
-    funcs: list[StatFuncProtocol]
-
-    def warmup(self):
-        arr: NDArray[np.float64] = np.random.rand(1000, 10).astype(np.float64)
-        for func in self.funcs:
-            for _ in range(10):
-                func(arr)
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(config.array, config.length, config.min_length, True)

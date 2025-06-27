@@ -1,4 +1,4 @@
-from structs import COLORS, StatType, Library, COLORS_BENCH
+from structs import COLORS, StatType, Library, COLORS_BENCH, BenchmarkConfig
 from manager import BenchmarkManager
 from numpy.typing import NDArray
 import numpy as np
@@ -7,13 +7,10 @@ import polars as pl
 from typing import Literal
 
 
-def plot_histograms_for_all_groups(
-    manager: BenchmarkManager, array: NDArray[np.float64], time_target: int
+def plot_global_bench(
+    manager: BenchmarkManager, config: BenchmarkConfig
 ) -> None:
-    combined_results = manager.get_perf_for_all_groups(
-        array=array,
-        time_target=time_target,
-    )
+    combined_results = manager.get_perf_for_all_groups(config=config)
     bench = (
         combined_results.group_by(["Group", "Library"])
         .agg(pl.col("Time (ms)").mean().alias("avg_time"), maintain_order=True)
@@ -26,16 +23,13 @@ def plot_histograms_for_all_groups(
                 (pl.col(Library.NUMBAGG) - pl.col(Library.RUSTATS_PARALLEL)).alias(
                     Library.NBG_BENCH
                 ),
-                (pl.col(Library.POLARS) - pl.col(Library.RUSTATS)).alias(
-                    Library.PL_BENCH_SINGLE
-                ),
                 (pl.col(Library.POLARS) - pl.col(Library.RUSTATS_PARALLEL)).alias(
-                    Library.PL_BENCH_PARALLEL
+                    Library.PL_BENCH
                 ),
             ]
         )
         .unpivot(
-            on=[Library.BN_BENCH, Library.NBG_BENCH],
+            on=[Library.BN_BENCH, Library.NBG_BENCH, Library.PL_BENCH],
             index="Group",
             value_name="Diff",
             variable_name="Comparison",
@@ -65,39 +59,11 @@ def plot_histograms_for_all_groups(
         color_discrete_map=COLORS_BENCH,
     ).show()
 
-
-def plot_function_results(
-    results: dict[Library, NDArray[np.float64]],
-    group_name: str,
-) -> None:
-    data: pl.DataFrame = pl.DataFrame(
-        {
-            "Library": [
-                lib for lib in results.keys() for _ in range(results[lib].shape[0])
-            ],
-            "Index": [
-                i for lib in results.keys() for i in range(results[lib].shape[0])
-            ],
-            "Values": [value for lib in results.keys() for value in results[lib][:, 0]],
-        }
-    )
-
-    px.line(  # type: ignore
-        data.to_pandas(),
-        x="Index",
-        y="Values",
-        color="Library",
-        title=f"Results Check - {group_name}",
-        template="plotly_dark",
-        color_discrete_map=COLORS,
-    ).show()
-
-
-def plot_group_result(
+def plot_group_bench(
     avg_data: pl.DataFrame,
     group_name: StatType,
     kind: Literal["box", "violins", "line"],
-    limit: int,
+    limit: float,
 ) -> None:
     quantile_limit = limit / 100
     distribution_data = avg_data.join(
@@ -142,19 +108,49 @@ def plot_group_result(
             ).show()
 
 
+def plot_check(
+    results: dict[Library, NDArray[np.float64]],
+    group_name: str,
+) -> None:
+    data: pl.DataFrame = pl.DataFrame(
+        {
+            "Library": [
+                lib for lib in results.keys() for _ in range(results[lib].shape[0])
+            ],
+            "Index": [
+                i for lib in results.keys() for i in range(results[lib].shape[0])
+            ],
+            "Values": [value for lib in results.keys() for value in results[lib][:, 0]],
+        }
+    )
+
+    px.line(  # type: ignore
+        data.to_pandas(),
+        x="Index",
+        y="Values",
+        color="Library",
+        title=f"Results Check - {group_name}",
+        template="plotly_dark",
+        color_discrete_map=COLORS,
+    ).show()
+
+
 def plot_benchmark_results(
-    array: NDArray[np.float64],
+    config: BenchmarkConfig,
     manager: BenchmarkManager,
     group_name: StatType,
-    time_target: int,
-    limit: int,
 ) -> None:
     data: pl.DataFrame = manager.get_perf_for_group(
-        array=array,
+        config=config,
         group_name=group_name,
-        time_target=time_target,
     )
-    plot_group_result(avg_data=data, group_name=group_name, kind="box", limit=limit)
-    plot_group_result(avg_data=data, group_name=group_name, kind="violins", limit=limit)
+    plot_group_bench(
+        avg_data=data, group_name=group_name, kind="box", limit=config.limit
+    )
+    plot_group_bench(
+        avg_data=data, group_name=group_name, kind="violins", limit=config.limit
+    )
 
-    plot_group_result(avg_data=data, group_name=group_name, kind="line", limit=limit)
+    plot_group_bench(
+        avg_data=data, group_name=group_name, kind="line", limit=config.limit
+    )

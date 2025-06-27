@@ -3,9 +3,21 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from structs import FuncGroup, Result, Files, StatType
+from structs import StatFuncProtocol, Result, Files, StatType, BenchmarkConfig
 from tqdm import tqdm
 from time import perf_counter
+
+
+@dataclass(slots=True)
+class FuncGroup:
+    funcs: list[StatFuncProtocol]
+
+    def warmup(self) -> None:
+        arr: NDArray[np.float64] = np.random.rand(1000, 10).astype(np.float64)
+        config = BenchmarkConfig(array=arr, df=pl.from_numpy(arr))
+        for func in self.funcs:
+            for _ in range(10):
+                func(config)
 
 
 @dataclass(slots=True)
@@ -13,17 +25,14 @@ class BenchmarkManager:
     groups: dict[StatType, FuncGroup]
 
     def get_perf_for_group(
-        self,
-        array: NDArray[np.float64],
-        group_name: StatType,
-        time_target: float,
+        self, config: BenchmarkConfig, group_name: StatType
     ) -> pl.DataFrame:
         group = self.groups.get(group_name)
         if not group:
             raise KeyError(f"Group '{group_name}' not found.")
         group.warmup()
         n_passes: int = self.get_n_passes(
-            time_target=time_target, group_name=group_name
+            time_target=config.time_target, group_name=group_name
         )
         total: int = len(group.funcs) * n_passes
         results: list[Result] = []
@@ -31,7 +40,7 @@ class BenchmarkManager:
             for func in group.funcs:
                 for _ in range(n_passes):
                     start_time: float = perf_counter()
-                    func(arr=array)
+                    func(config)
                     elapsed_time: float = (perf_counter() - start_time) * 1000
                     results.append(
                         Result(
@@ -45,11 +54,9 @@ class BenchmarkManager:
         _save_total_time(group_name=group_name, results=results, n_passes=n_passes)
         return _get_formatted_results(results=results)
 
-    def get_perf_for_all_groups(
-        self, array: NDArray[np.float64], time_target: int
-    ) -> pl.DataFrame:
+    def get_perf_for_all_groups(self, config: BenchmarkConfig) -> pl.DataFrame:
         combined_results: list[Result] = []
-        time_by_group = int(time_target / len(self.groups))
+        time_by_group = int(config.time_target / len(self.groups))
         passes: dict[str, int] = {
             group_name: self.get_n_passes(
                 time_target=time_by_group, group_name=group_name
@@ -68,7 +75,7 @@ class BenchmarkManager:
                 for func in group.funcs:
                     for _ in range(n_passes):
                         start_time: float = perf_counter()
-                        func(arr=array)
+                        func(config)
                         elapsed_time: float = (perf_counter() - start_time) * 1000
                         results.append(
                             Result(

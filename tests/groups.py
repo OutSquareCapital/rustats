@@ -1,4 +1,5 @@
-from structs import FuncGroup, StatType
+from structs import StatType
+from manager import FuncGroup
 import funcs as fn
 
 ROLLING_FUNCS: dict[StatType, FuncGroup] = {

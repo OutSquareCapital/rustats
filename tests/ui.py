@@ -2,11 +2,11 @@ from manager import get_array
 import polars as pl
 from plots import (
     BenchmarkManager,
-    plot_histograms_for_all_groups,
+    plot_global_bench,
     plot_benchmark_results,
-    plot_function_results,
+    plot_check,
 )
-from structs import Files
+from structs import Files, BenchmarkConfig
 
 
 def display_menu() -> None:
@@ -17,37 +17,25 @@ def display_menu() -> None:
     print("4. Exit")
 
 
-def get_time_target() -> int:
-    time_input: str = input(
-        "write the time target in seconds, press enter for 20 seconds default>"
-    ).strip()
-    if time_input == "":
-        return 20
-    else:
-        return int(time_input)
-
-
 def main(manager: BenchmarkManager) -> None:
     while True:
         array = get_array(pl.read_parquet(source=Files.PRICES))
+        config = BenchmarkConfig(array=array, df=pl.from_numpy(array))
         display_menu()
         choice: str = input("Enter your choice (1-4)> ").strip()
         match choice:
             case "1":
-                plot_histograms_for_all_groups(
-                    manager=manager, array=array, time_target=get_time_target()
-                )
+                config.set_time_target()
+                plot_global_bench(manager=manager, config=config)
             case "2":
                 group_name: str = input("Enter the group to test> ").strip()
                 if group_name not in manager.groups:
                     print(f"Group '{group_name}' not found in rolling functions.")
                     continue
+
+                config.set_time_target()
                 plot_benchmark_results(
-                    array=array,
-                    manager=manager,
-                    group_name=group_name,
-                    time_target=get_time_target(),
-                    limit=95,
+                    config=config, manager=manager, group_name=group_name
                 )
             case "3":
                 group_name: str = input(
@@ -57,10 +45,10 @@ def main(manager: BenchmarkManager) -> None:
                     print(f"Group '{group_name}' not found in rolling functions.")
                     continue
                 results = {
-                    func.library: func(array)
+                    func.library: func(config)
                     for func in manager.groups[group_name].funcs
                 }
-                plot_function_results(results=results, group_name=group_name)
+                plot_check(results=results, group_name=group_name)
             case "4":
                 print("Exiting...")
                 break
