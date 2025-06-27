@@ -1,12 +1,10 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum, auto, IntEnum
-from time import perf_counter
 from typing import Literal, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
-from tqdm import tqdm
 
 type Computation = Callable[[NDArray[np.float64]], NDArray[np.float64]]
 
@@ -85,28 +83,3 @@ class FuncGroup:
         for func in self.funcs:
             for _ in range(10):
                 func(arr)
-
-    def time_group(
-        self,
-        group_name: str,
-        arr: NDArray[np.float64],
-        n_passes: int,
-    ) -> list[Result]:
-        results: list[Result] = []
-        total: int = len(self.funcs) * n_passes
-        with tqdm(total=total) as pbar:
-            for func in self.funcs:
-                pbar.set_description(f"Timing {group_name} - {func.library}")
-                for _ in range(n_passes):
-                    start_time: float = perf_counter()
-                    func(arr=arr)
-                    elapsed_time: float = (perf_counter() - start_time) * 1000
-                    results.append(
-                        Result(
-                            library=func.library,
-                            group=group_name,
-                            time=elapsed_time,
-                        )
-                    )
-                    pbar.update(1)
-        return results

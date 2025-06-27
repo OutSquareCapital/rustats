@@ -251,11 +251,21 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
         funcs=[
             StatFunc(
                 Library.RUSTATS,
-                partial(rs.move_skewness, length=Length.FULL, min_length=Length.MIN, parallel=False),
+                partial(
+                    rs.move_skewness,
+                    length=Length.FULL,
+                    min_length=Length.MIN,
+                    parallel=False,
+                ),
             ),
             StatFunc(
                 Library.RUSTATS_PARALLEL,
-                partial(rs.move_skewness, length=Length.FULL, min_length=Length.MIN, parallel=True),
+                partial(
+                    rs.move_skewness,
+                    length=Length.FULL,
+                    min_length=Length.MIN,
+                    parallel=True,
+                ),
             ),
         ],
     ),
@@ -263,11 +273,21 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
         funcs=[
             StatFunc(
                 Library.RUSTATS,
-                partial(rs.move_kurtosis, length=Length.FULL, min_length=Length.MIN, parallel=False),
+                partial(
+                    rs.move_kurtosis,
+                    length=Length.FULL,
+                    min_length=Length.MIN,
+                    parallel=False,
+                ),
             ),
             StatFunc(
                 Library.RUSTATS_PARALLEL,
-                partial(rs.move_kurtosis, length=Length.FULL, min_length=Length.MIN, parallel=True),
+                partial(
+                    rs.move_kurtosis,
+                    length=Length.FULL,
+                    min_length=Length.MIN,
+                    parallel=True,
+                ),
             ),
         ],
     ),
