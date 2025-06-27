@@ -1,10 +1,62 @@
 use crate::stats;
 use std::collections::VecDeque;
 use numpy::ndarray::{ ArrayBase, ViewRepr, Dim };
+pub struct Squared {
+    sum: f64,
+    sum_squared: f64,
+}
 
-pub struct Squared(f64, f64);
-pub struct Cubic(f64, f64, f64, f64);
-pub struct Quadratric(f64, f64, f64, f64, f64, f64);
+impl Squared {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            sum: 0.0,
+            sum_squared: 0.0,
+        }
+    }
+}
+
+pub struct Cubic {
+    sum: f64,
+    sum_squared: f64,
+    sum_cubic: f64,
+    compensation_cubic: f64,
+}
+
+impl Cubic {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            sum: 0.0,
+            sum_squared: 0.0,
+            sum_cubic: 0.0,
+            compensation_cubic: 0.0,
+        }
+    }
+}
+
+pub struct Quadratric {
+    sum: f64,
+    sum_squared: f64,
+    sum_cubic: f64,
+    compensation_cubic: f64,
+    sum_quad: f64,
+    compensation_quad: f64,
+}
+
+impl Quadratric {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            sum: 0.0,
+            sum_squared: 0.0,
+            sum_cubic: 0.0,
+            compensation_cubic: 0.0,
+            sum_quad: 0.0,
+            compensation_quad: 0.0,
+        }
+    }
+}
 
 pub struct WindowState {
     pub observations: usize,
@@ -34,7 +86,7 @@ impl WindowState {
         self.precedent = input_col[self.precedent_idx];
     }
     #[inline(always)]
-    pub fn compute_row<Calculator: StatCalculator>(&mut self, state: &mut Calculator::State) {
+    pub fn compute_row<Calculator: StatCalculator>(&mut self, state: &mut Calculator::Accumulator) {
         if !self.current.is_nan() {
             self.observations += 1;
             Calculator::add_value(state, self.current);
@@ -68,12 +120,12 @@ impl WindowState {
 }
 
 pub trait StatCalculator {
-    type State;
+    type Accumulator;
 
-    fn new() -> Self::State;
-    fn add_value(state: &mut Self::State, value: f64);
-    fn remove_value(state: &mut Self::State, value: f64);
-    fn get(state: &Self::State, count: usize) -> f64;
+    fn new() -> Self::Accumulator;
+    fn add_value(state: &mut Self::Accumulator, value: f64);
+    fn remove_value(state: &mut Self::Accumulator, value: f64);
+    fn get(state: &Self::Accumulator, count: usize) -> f64;
 }
 
 pub trait DequeStatCalculator {
@@ -82,145 +134,145 @@ pub trait DequeStatCalculator {
 }
 pub struct Sum;
 impl StatCalculator for Sum {
-    type State = f64;
+    type Accumulator = f64;
 
-    fn new() -> Self::State {
+    fn new() -> Self::Accumulator {
         0.0
     }
-    fn add_value(state: &mut Self::State, value: f64) {
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
         *state += value;
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
         *state -= value;
     }
-    fn get(state: &Self::State, _count: usize) -> f64 {
+    fn get(state: &Self::Accumulator, _count: usize) -> f64 {
         *state
     }
 }
 
 pub struct Mean;
 impl StatCalculator for Mean {
-    type State = f64;
+    type Accumulator = f64;
 
-    fn new() -> Self::State {
+    fn new() -> Self::Accumulator {
         0.0
     }
-    fn add_value(state: &mut Self::State, value: f64) {
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
         *state += value;
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
         *state -= value;
     }
-    fn get(state: &Self::State, count: usize) -> f64 {
+    fn get(state: &Self::Accumulator, count: usize) -> f64 {
         *state / (count as f64)
     }
 }
 pub struct Var;
 impl StatCalculator for Var {
-    type State = Squared;
+    type Accumulator = Squared;
 
-    fn new() -> Self::State {
-        Squared(0.0, 0.0)
+    fn new() -> Self::Accumulator {
+        Squared::new()
     }
-    fn add_value(state: &mut Self::State, value: f64) {
-        state.0 += value;
-        state.1 += value.powi(2);
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum += value;
+        state.sum_squared += value.powi(2);
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
-        state.0 -= value;
-        state.1 -= value.powi(2);
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum -= value;
+        state.sum_squared -= value.powi(2);
     }
-    fn get(state: &Self::State, count: usize) -> f64 {
-        stats::var(state.0, state.1, count as f64)
+    fn get(state: &Self::Accumulator, count: usize) -> f64 {
+        stats::var(state.sum, state.sum_squared, count as f64)
     }
 }
 
 pub struct Stdev;
 impl StatCalculator for Stdev {
-    type State = Squared;
+    type Accumulator = Squared;
 
-    fn new() -> Self::State {
-        Squared(0.0, 0.0)
+    fn new() -> Self::Accumulator {
+        Squared::new()
     }
-    fn add_value(state: &mut Self::State, value: f64) {
-        state.0 += value;
-        state.1 += value.powi(2);
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum += value;
+        state.sum_squared += value.powi(2);
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
-        state.0 -= value;
-        state.1 -= value.powi(2);
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum -= value;
+        state.sum_squared -= value.powi(2);
     }
-    fn get(state: &Self::State, count: usize) -> f64 {
-        stats::stdev(state.0, state.1, count as f64)
+    fn get(state: &Self::Accumulator, count: usize) -> f64 {
+        stats::stdev(state.sum, state.sum_squared, count as f64)
     }
 }
 
 pub struct Skewness;
 impl StatCalculator for Skewness {
-    type State = Cubic;
+    type Accumulator = Cubic;
 
-    fn new() -> Self::State {
-        Cubic(0.0, 0.0, 0.0, 0.0)
+    fn new() -> Self::Accumulator {
+        Cubic::new()
     }
-    fn add_value(state: &mut Self::State, value: f64) {
-        state.0 += value;
-        state.1 += value.powi(2);
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum += value;
+        state.sum_squared += value.powi(2);
 
-        let temp: f64 = value.powi(3) - state.3;
-        let total: f64 = state.2 + temp;
-        state.3 = total - state.2 - temp;
-        state.2 = total;
+        let temp: f64 = value.powi(3) - state.compensation_cubic;
+        let total: f64 = state.sum_cubic + temp;
+        state.compensation_cubic = total - state.sum_cubic - temp;
+        state.sum_cubic = total;
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
-        state.0 -= value;
-        state.1 -= value.powi(2);
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum -= value;
+        state.sum_squared -= value.powi(2);
 
-        let temp: f64 = -value.powi(3) - state.3;
-        let total: f64 = state.2 + temp;
-        state.3 = total - state.2 - temp;
-        state.2 = total;
+        let temp: f64 = -value.powi(3) - state.compensation_cubic;
+        let total: f64 = state.sum_cubic + temp;
+        state.compensation_cubic = total - state.sum_cubic - temp;
+        state.sum_cubic = total - state.sum_squared - temp;
     }
-    fn get(state: &Self::State, count: usize) -> f64 {
-        stats::skew(state.0, state.1, state.2, count as f64)
+    fn get(state: &Self::Accumulator, count: usize) -> f64 {
+        stats::skew(state.sum, state.sum_squared, state.sum_cubic, count as f64)
     }
 }
 pub struct Kurtosis;
 impl StatCalculator for Kurtosis {
-    type State = Quadratric;
+    type Accumulator = Quadratric;
 
-    fn new() -> Self::State {
-        Quadratric(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    fn new() -> Self::Accumulator {
+        Quadratric::new()
     }
-    fn add_value(state: &mut Self::State, value: f64) {
-        state.0 += value;
-        state.1 += value.powi(2);
+    fn add_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum += value;
+        state.sum_squared += value.powi(2);
 
-        let temp: f64 = value.powi(3) - state.3;
-        let total: f64 = state.2 + temp;
-        state.3 = total - state.2 - temp;
-        state.2 = total;
+        let temp: f64 = value.powi(3) - state.sum_cubic;
+        let total: f64 = state.sum_cubic + temp;
+        state.compensation_cubic = total - state.sum_cubic - temp;
+        state.sum_cubic = total;
 
-        let temp: f64 = value.powi(4) - state.5;
-        let total: f64 = state.4 + temp;
-        state.5 = total - state.4 - temp;
-        state.4 = total;
+        let temp: f64 = value.powi(4) - state.sum_quad;
+        let total: f64 = state.compensation_quad + temp;
+        state.compensation_quad = total - state.sum_quad - temp;
+        state.sum_quad = total;
     }
-    fn remove_value(state: &mut Self::State, value: f64) {
-        state.0 -= value;
-        state.1 -= value.powi(2);
+    fn remove_value(state: &mut Self::Accumulator, value: f64) {
+        state.sum -= value;
+        state.sum_squared -= value.powi(2);
 
-        let temp: f64 = -value.powi(3) - state.3;
-        let total: f64 = state.2 + temp;
-        state.3 = total - state.2 - temp;
-        state.2 = total;
+        let temp: f64 = -value.powi(3) - state.sum_cubic;
+        let total: f64 = state.sum_squared + temp;
+        state.sum_cubic = total - state.compensation_cubic - temp;
+        state.sum_squared = total;
 
-        let temp: f64 = -value.powi(4) - state.5;
-        let total: f64 = state.4 + temp;
-        state.5 = total - state.4 - temp;
-        state.4 = total;
+        let temp: f64 = -value.powi(4) - state.sum_quad;
+        let total: f64 = state.compensation_quad + temp;
+        state.sum_quad = total - state.compensation_quad - temp;
+        state.compensation_quad = total;
     }
-    fn get(state: &Self::State, count: usize) -> f64 {
-        stats::kurtosis(state.0, state.1, state.2, state.4, count as f64)
+    fn get(state: &Self::Accumulator, count: usize) -> f64 {
+        stats::kurtosis(state.sum, state.sum_squared, state.sum_cubic, state.sum_quad, count as f64)
     }
 }
 
