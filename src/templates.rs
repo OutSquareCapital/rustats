@@ -52,14 +52,12 @@ pub fn move_rank<'py>(
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
     if parallel {
-        py.allow_threads(move || {
-            input_columns
-                .into_par_iter()
-                .zip(output_columns.par_iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_rank_column(&input_col, output_col, length, min_length, num_rows);
-                });
-        });
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                process_rank_column(&input_col, output_col, length, min_length, num_rows);
+            });
     } else {
         py.allow_threads(move || {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
@@ -85,20 +83,12 @@ pub fn move_template<Stat: calculators::StatCalculator>(
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
     if parallel {
-        py.allow_threads(move || {
-            input_columns
-                .into_par_iter()
-                .zip(output_columns.par_iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_stat_column::<Stat>(
-                        &input_col,
-                        output_col,
-                        length,
-                        min_length,
-                        num_rows
-                    );
-                });
-        });
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                process_stat_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
+            });
     } else {
         py.allow_threads(move || {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
@@ -124,20 +114,12 @@ pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
     if parallel {
-        py.allow_threads(move || {
-            input_columns
-                .into_par_iter()
-                .zip(output_columns.par_iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_deque_column::<Stat>(
-                        &input_col,
-                        output_col,
-                        length,
-                        min_length,
-                        num_rows
-                    );
-                });
-        });
+        input_columns
+            .into_par_iter()
+            .zip(output_columns.par_iter_mut())
+            .for_each(|(input_col, output_col)| {
+                process_deque_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
+            });
     } else {
         py.allow_threads(move || {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
