@@ -51,7 +51,9 @@ class BenchmarkManager:
         combined_results: list[Result] = []
         time_by_group = int(time_target / len(self.groups))
         passes: dict[str, int] = {
-            group_name: self.get_n_passes(time_target=time_by_group, group_name=group_name)
+            group_name: self.get_n_passes(
+                time_target=time_by_group, group_name=group_name
+            )
             for group_name in self.groups.keys()
         }
         total_passes: int = sum(

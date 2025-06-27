@@ -26,6 +26,12 @@ def plot_histograms_for_all_groups(
                 (pl.col(Library.NUMBAGG) - pl.col(Library.RUSTATS_PARALLEL)).alias(
                     Library.NBG_BENCH
                 ),
+                (pl.col(Library.POLARS) - pl.col(Library.RUSTATS)).alias(
+                    Library.PL_BENCH_SINGLE
+                ),
+                (pl.col(Library.POLARS) - pl.col(Library.RUSTATS_PARALLEL)).alias(
+                    Library.PL_BENCH_PARALLEL
+                ),
             ]
         )
         .unpivot(

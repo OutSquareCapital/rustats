@@ -19,7 +19,7 @@ def display_menu() -> None:
 
 def get_time_target() -> int:
     time_input: str = input(
-        "write the time target in seconds, press enter for 20 seconds default:"
+        "write the time target in seconds, press enter for 20 seconds default>"
     ).strip()
     if time_input == "":
         return 20
@@ -31,14 +31,14 @@ def main(manager: BenchmarkManager) -> None:
     while True:
         array = get_array(pl.read_parquet(source=Files.PRICES))
         display_menu()
-        choice: str = input("Enter your choice (1-4): ").strip()
+        choice: str = input("Enter your choice (1-4)> ").strip()
         match choice:
             case "1":
                 plot_histograms_for_all_groups(
                     manager=manager, array=array, time_target=get_time_target()
                 )
             case "2":
-                group_name: str = input("Enter the group to test: ").strip()
+                group_name: str = input("Enter the group to test> ").strip()
                 if group_name not in manager.groups:
                     print(f"Group '{group_name}' not found in rolling functions.")
                     continue
@@ -51,7 +51,7 @@ def main(manager: BenchmarkManager) -> None:
                 )
             case "3":
                 group_name: str = input(
-                    "Enter the group to check results for: "
+                    "Enter the group to check results for> "
                 ).strip()
                 if group_name not in manager.groups:
                     print(f"Group '{group_name}' not found in rolling functions.")

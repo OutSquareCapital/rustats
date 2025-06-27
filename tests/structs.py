@@ -1,12 +1,15 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum, auto, IntEnum
-from typing import Literal, NamedTuple
-
+from typing import Literal, NamedTuple, Protocol
 import numpy as np
 from numpy.typing import NDArray
+import polars as pl
 
 type Computation = Callable[[NDArray[np.float64]], NDArray[np.float64]]
+type RSFunc = Callable[[NDArray[np.float64], int, int, bool], NDArray[np.float64]]
+type BNFunc = Callable[[NDArray[np.float64], int, int, int], NDArray[np.float64]]
+type NBGFunc = Callable[[NDArray[np.float64], int, int, int], NDArray[np.float64]]
 
 
 class Length(IntEnum):
@@ -20,12 +23,15 @@ class Files(StrEnum):
 
 
 class Library(StrEnum):
+    POLARS = auto()
     BOTTLENECK = auto()
     RUSTATS = auto()
     RUSTATS_PARALLEL = auto()
     NUMBAGG = auto()
     BN_BENCH = f"{BOTTLENECK} - {RUSTATS}"
     NBG_BENCH = f"{NUMBAGG} - {RUSTATS_PARALLEL}"
+    PL_BENCH_SINGLE = f"{POLARS} - {RUSTATS}"
+    PL_BENCH_PARALLEL = f"{POLARS} - {RUSTATS_PARALLEL}"
 
 
 COLORS: dict[Library, str] = {
@@ -33,11 +39,14 @@ COLORS: dict[Library, str] = {
     Library.RUSTATS_PARALLEL: "red",
     Library.NUMBAGG: "cyan",
     Library.BOTTLENECK: "lime",
+    Library.POLARS: "white",
 }
 
 COLORS_BENCH: dict[Library, str] = {
     Library.BN_BENCH: "lime",
     Library.NBG_BENCH: "cyan",
+    Library.PL_BENCH_SINGLE: "orange",
+    Library.PL_BENCH_PARALLEL: "white",
 }
 
 StatType = Literal[
@@ -60,23 +69,63 @@ class Result(NamedTuple):
     time: float
 
 
-class StatFunc:
+class StatFuncProtocol(Protocol):
+    library: Library
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
+
+class StatFunc[T: Callable[..., NDArray[np.float64]] | pl.Expr]:
+    library: Library
+
     def __init__(
         self,
-        library: Library,
-        func: Computation,
+        func: T,
     ) -> None:
-        self.library: Library = library
-        self.func: Computation = func
+        self.func: T = func
         self.results: list[Result] = []
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
+
+class BnFunc(StatFunc[BNFunc]):
+    library = Library.BOTTLENECK
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
+        return self.func(arr, Length.FULL, Length.MIN, 0)
+
+
+class NbgFunc(StatFunc[Computation]):
+    library = Library.NUMBAGG
 
     def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
         return self.func(arr)
 
 
+class PlFunc(StatFunc[pl.Expr]):
+    library = Library.POLARS
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
+        return pl.from_numpy(data=arr).select(self.func).to_numpy().astype(np.float64)
+
+
+class RSingleFunc(StatFunc[RSFunc]):
+    library = Library.RUSTATS
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
+        return self.func(arr, Length.FULL, Length.MIN, False)
+
+
+class RParallelFunc(StatFunc[RSFunc]):
+    library = Library.RUSTATS_PARALLEL
+
+    def __call__(self, arr: NDArray[np.float64]) -> NDArray[np.float64]:
+        return self.func(arr, Length.FULL, Length.MIN, True)
+
+
 @dataclass(slots=True)
 class FuncGroup:
-    funcs: list[StatFunc]
+    funcs: list[StatFuncProtocol]
 
     def warmup(self):
         arr: NDArray[np.float64] = np.random.rand(1000, 10).astype(np.float64)
