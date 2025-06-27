@@ -26,7 +26,7 @@ pub fn move_median<'py>(
                 .for_each(|(input_col, output_col)| {
                     let mut small_heap = Indexed::new(length, num_rows, true);
                     let mut large_heap = Indexed::new(length, num_rows, false);
-                    let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
+                    let mut window_q = VecDeque::with_capacity(length + 1);
                     let mut window = calculators::WindowState::new();
 
                     for row in 0..length {
@@ -139,8 +139,8 @@ pub fn move_median<'py>(
                 .zip(output_columns.iter_mut()) {
                 let mut small_heap = Indexed::new(length, num_rows, true);
                 let mut large_heap = Indexed::new(length, num_rows, false);
-                let mut window_q: VecDeque<(f64, usize)> = VecDeque::with_capacity(length + 1);
-                let mut window: calculators::WindowState = calculators::WindowState::new();
+                let mut window_q = VecDeque::with_capacity(length + 1);
+                let mut window = calculators::WindowState::new();
 
                 for row in 0..length {
                     window.current = input_col[row];
@@ -346,7 +346,10 @@ impl Indexed {
             }
 
             let right: usize = left + 1;
-            let target = if right < len && self.compare(self.heap[right].0, self.heap[left].0) {
+            let target: usize = if
+                right < len &&
+                self.compare(self.heap[right].0, self.heap[left].0)
+            {
                 right
             } else {
                 left

@@ -108,7 +108,7 @@ pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
                         window.current = input_col[row];
                         if !window.current.is_nan() {
                             window.observations += 1;
-                            Stat::add_with_index(&mut deque, window.current, row);
+                            Stat::add_value(&mut deque, window.current, row);
                         }
                         if window.observations >= min_length {
                             if let Some(&(val, _)) = deque.front() {
@@ -142,7 +142,7 @@ pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
                     window.current = input_col[row];
                     if !window.current.is_nan() {
                         window.observations += 1;
-                        Stat::add_with_index(&mut deque, window.current, row);
+                        Stat::add_value(&mut deque, window.current, row);
                     }
                     if window.observations >= min_length {
                         if let Some(&(val, _)) = deque.front() {

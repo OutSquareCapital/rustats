@@ -2,6 +2,10 @@ use crate::stats;
 use std::collections::VecDeque;
 use numpy::ndarray::{ ArrayBase, ViewRepr, Dim };
 
+pub struct Squared(f64, f64);
+pub struct Cubic(f64, f64, f64, f64);
+pub struct Quadratric(f64, f64, f64, f64, f64, f64);
+
 pub struct WindowState {
     pub observations: usize,
     pub current: f64,
@@ -58,7 +62,7 @@ impl WindowState {
 
         if !self.current.is_nan() {
             self.observations += 1;
-            Calculator::add_with_index(deque, self.current, row);
+            Calculator::add_value(deque, self.current, row);
         }
     }
 }
@@ -74,7 +78,7 @@ pub trait StatCalculator {
 
 pub trait DequeStatCalculator {
     fn new() -> VecDeque<(f64, usize)>;
-    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize);
+    fn add_value(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize);
 }
 pub struct Sum;
 impl StatCalculator for Sum {
@@ -113,10 +117,10 @@ impl StatCalculator for Mean {
 }
 pub struct Var;
 impl StatCalculator for Var {
-    type State = (f64, f64);
+    type State = Squared;
 
     fn new() -> Self::State {
-        (0.0, 0.0)
+        Squared(0.0, 0.0)
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
@@ -133,10 +137,10 @@ impl StatCalculator for Var {
 
 pub struct Stdev;
 impl StatCalculator for Stdev {
-    type State = (f64, f64);
+    type State = Squared;
 
     fn new() -> Self::State {
-        (0.0, 0.0)
+        Squared(0.0, 0.0)
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
@@ -153,10 +157,10 @@ impl StatCalculator for Stdev {
 
 pub struct Skewness;
 impl StatCalculator for Skewness {
-    type State = (f64, f64, f64, f64);
+    type State = Cubic;
 
     fn new() -> Self::State {
-        (0.0, 0.0, 0.0, 0.0)
+        Cubic(0.0, 0.0, 0.0, 0.0)
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
@@ -182,10 +186,10 @@ impl StatCalculator for Skewness {
 }
 pub struct Kurtosis;
 impl StatCalculator for Kurtosis {
-    type State = (f64, f64, f64, f64, f64, f64);
+    type State = Quadratric;
 
     fn new() -> Self::State {
-        (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        Quadratric(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     }
     fn add_value(state: &mut Self::State, value: f64) {
         state.0 += value;
@@ -226,7 +230,7 @@ impl DequeStatCalculator for Min {
         VecDeque::new()
     }
 
-    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
+    fn add_value(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
             if val > value {
                 deque.pop_back();
@@ -244,7 +248,7 @@ impl DequeStatCalculator for Max {
         VecDeque::new()
     }
 
-    fn add_with_index(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
+    fn add_value(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
             if val < value {
                 deque.pop_back();
