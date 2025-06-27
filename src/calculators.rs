@@ -230,7 +230,7 @@ impl StatCalculator for Skewness {
         let temp: f64 = -value.powi(3) - state.compensation_cubic;
         let total: f64 = state.sum_cubic + temp;
         state.compensation_cubic = total - state.sum_cubic - temp;
-        state.sum_cubic = total - state.sum_squared - temp;
+        state.sum_cubic = total;
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
         stats::skew(state.sum, state.sum_squared, state.sum_cubic, count as f64)
@@ -261,15 +261,15 @@ impl StatCalculator for Kurtosis {
         state.sum -= value;
         state.sum_squared -= value.powi(2);
 
-        let temp: f64 = -value.powi(3) - state.sum_cubic;
-        let total: f64 = state.sum_squared + temp;
-        state.sum_cubic = total - state.compensation_cubic - temp;
-        state.sum_squared = total;
+        let temp: f64 = -value.powi(3) - state.compensation_cubic;
+        let total: f64 = state.sum_cubic + temp;
+        state.compensation_cubic = total - state.sum_cubic - temp;
+        state.sum_cubic = total;
 
         let temp: f64 = -value.powi(4) - state.sum_quad;
         let total: f64 = state.compensation_quad + temp;
-        state.sum_quad = total - state.compensation_quad - temp;
-        state.compensation_quad = total;
+        state.compensation_quad = total - state.compensation_quad - temp;
+        state.sum_quad = total;
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
         stats::kurtosis(state.sum, state.sum_squared, state.sum_cubic, state.sum_quad, count as f64)

@@ -1,19 +1,19 @@
 #[inline(always)]
-pub fn var(mean_sum: f64, mean_square_sum: f64, obs: f64) -> f64 {
-    (mean_square_sum / obs - (mean_sum / obs).powi(2)) * (obs / (obs - 1.0))
+pub fn var(sum_simple: f64, sum_squared: f64, obs: f64) -> f64 {
+    (sum_squared / obs - (sum_simple / obs).powi(2)) * (obs / (obs - 1.0))
 }
 
 #[inline(always)]
-pub fn stdev(mean_sum: f64, mean_square_sum: f64, obs: f64) -> f64 {
-    var(mean_sum, mean_square_sum, obs).sqrt()
+pub fn stdev(sum_simple: f64, sum_squared: f64, obs: f64) -> f64 {
+    var(sum_simple, sum_squared, obs).sqrt()
 }
 
 #[inline(always)]
-pub fn skew(mean_sum: f64, mean_square_sum: f64, cubed_accumulator: f64, obs: f64) -> f64 {
-    let mean_value: f64 = mean_sum / obs;
-    let variance_value: f64 = var(mean_sum, mean_square_sum, obs);
+pub fn skew(sum_simple: f64, sum_squared: f64, sum_cubed: f64, obs: f64) -> f64 {
+    let mean_value: f64 = sum_simple / obs;
+    let variance_value: f64 = var(sum_simple, sum_squared, obs);
     let skew_numerator: f64 =
-        cubed_accumulator / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
+        sum_cubed / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
 
     let std_dev: f64 = variance_value.sqrt();
 
@@ -22,20 +22,14 @@ pub fn skew(mean_sum: f64, mean_square_sum: f64, cubed_accumulator: f64, obs: f6
 }
 
 #[inline(always)]
-pub fn kurtosis(
-    mean_sum: f64,
-    mean_square_sum: f64,
-    cubed_accumulator: f64,
-    quartic_accumulator: f64,
-    obs: f64
-) -> f64 {
-    let mean_value: f64 = mean_sum / obs;
-    let variance_value: f64 = var(mean_sum, mean_square_sum, obs);
+pub fn kurtosis(sum_simple: f64, sum_squared: f64, sum_cubed: f64, sum_quad: f64, obs: f64) -> f64 {
+    let mean_value: f64 = sum_simple / obs;
+    let variance_value: f64 = var(sum_simple, sum_squared, obs);
     let skew_numerator: f64 =
-        cubed_accumulator / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
+        sum_cubed / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
 
     let kurtosis_term: f64 =
-        quartic_accumulator / obs -
+        sum_quad / obs -
         mean_value.powi(4) -
         6.0 * variance_value * mean_value.powi(2) -
         4.0 * skew_numerator * mean_value;
