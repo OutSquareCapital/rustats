@@ -7,9 +7,7 @@ import polars as pl
 from typing import Literal
 
 
-def plot_global_bench(
-    manager: BenchmarkManager, config: BenchmarkConfig
-) -> None:
+def plot_global_bench(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
     combined_results = manager.get_perf_for_all_groups(config=config)
     bench = (
         combined_results.group_by(["Group", "Library"])
@@ -58,6 +56,7 @@ def plot_global_bench(
         template="plotly_dark",
         color_discrete_map=COLORS_BENCH,
     ).show()
+
 
 def plot_group_bench(
     avg_data: pl.DataFrame,

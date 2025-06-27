@@ -1,5 +1,41 @@
 # Rustats
 
+Rustats is a WIP Python library that re-implements functions available in polars, bottleneck, and numbagg. 
+Designed specifically for 2D numpy arrays holding floats, all the code implementation is done in Rust, allowing high performance, memory safety, and a code which is IMO much clearer than any C implementation. 
+
+## Performance
+
+- Matches bottleneck speed on a single thread, with Polars it depends.
+- Faster than bottleneck when running in parallel, as well as Polars (except for a few functions, but it's most likely due to algorithm specific implementations)
+- Currently slower than numbagg. However Rustats does not have a first call overhead from numba JIT compilation.
+- Provides modern type hints for all functions(something that unfortunately lacks for bottleneck and numbagg/numba).
+
+## Usage example
+
+Most functions share this signature
+````python
+def move_sum(
+    array: NDArray[np.float64], length: int, min_length: int, parallel: bool
+) -> NDArray[np.float64]: ...
+````
+To use it simply do this:
+
+````python
+import rustats as rs
+import numpy as np
+
+result = rs.move_sum(
+    array=np.random.rand(10000, 10), 
+    length=250, 
+    min_length=25, 
+    parallel=True
+    )
+````
+
+To run it in parallel, simply provide True to the argument for a big performance boost. 
+But if you have multiple threads already running (with concurrent futures for example), specifying False is recommended.
+
+
 ## Installation
 
 ````
@@ -46,9 +82,9 @@ Ensure you have 2 powershell terminals, one in rustats, the other in rustats\tes
 
 When testing, you'll be able to choose wether launching a global test, or a benchmark for a specific group. 
 
-You can specify a time duration target (for quick tests flexibility), wether it's a global or specific test. 
+You can specify a time duration target (for quick tests flexibility), wether it's a global or specific test.
 
-The number of functions call will be adjusted accordingly
+The number of functions call will be adjusted accordingly.
 
 Currently the distribution plots are filtered to exclude +95th percentile times.
 
