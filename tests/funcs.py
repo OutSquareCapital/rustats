@@ -1,9 +1,73 @@
-import polars as pl
+from collections.abc import Callable
 from functools import partial
+from typing import Any, Protocol
+
 import bottleneck as bn
 import numbagg as nbg
+import numpy as np
+import polars as pl
 import rustats as rs
-from structs import PlFunc, BnFunc, NbgFunc, RSingleFunc, RParallelFunc
+from numpy.typing import NDArray
+
+from structs import BenchmarkConfig, Library
+
+
+class StatFuncProtocol(Protocol):
+    library: Library
+
+    def __call__(self, config: BenchmarkConfig) -> Any: ...
+
+
+class StatFunc[T: NDArray[np.float64] | pl.DataFrame]:
+    library: Library
+
+    def __init__(self, func: Callable[..., T]) -> None:
+        self.func = func
+
+
+class BnFunc(StatFunc[NDArray[np.float64]]):
+    library = Library.BOTTLENECK
+
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(
+            config.array,
+            window=config.length,
+            min_count=config.min_length,
+            axis=config.axis,
+        )
+
+
+class NbgFunc(StatFunc[NDArray[np.float64]]):
+    library = Library.NUMBAGG
+
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(
+            config.array,
+            window=config.length,
+            min_count=config.min_length,
+            axis=config.axis,
+        )
+
+
+class PlFunc(StatFunc[pl.DataFrame]):
+    library = Library.POLARS
+
+    def __call__(self, config: BenchmarkConfig) -> pl.DataFrame:
+        return self.func(config.df, length=config.length, min_length=config.min_length)
+
+
+class RSingleFunc(StatFunc[NDArray[np.float64]]):
+    library = Library.RUSTATS
+
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(config.array, config.length, config.min_length, False)
+
+
+class RParallelFunc(StatFunc[NDArray[np.float64]]):
+    library = Library.RUSTATS_PARALLEL
+
+    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
+        return self.func(config.array, config.length, config.min_length, True)
 
 
 def move_mean(df: pl.DataFrame, length: int, min_length: int) -> pl.DataFrame:

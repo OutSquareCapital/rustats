@@ -1,10 +1,18 @@
-from collections.abc import Callable
 from enum import StrEnum, auto
-from typing import Literal, NamedTuple, Protocol, Any
+from typing import NamedTuple
 import numpy as np
 from dataclasses import dataclass
+from importlib import metadata
 from numpy.typing import NDArray
 import polars as pl
+
+
+class ColNames(StrEnum):
+    GROUP = "Group"
+    TIME_MS = "Time (ms)"
+    LIBRARY = "Library"
+    VERSION = auto()
+    TIME_TARGET = auto()
 
 
 @dataclass(slots=True)
@@ -16,18 +24,22 @@ class BenchmarkConfig:
     axis: int = 0
     time_target: int = 20
     limit: float = 0.95
+    version_nb = metadata.version("rustats")
 
     def set_time_target(self) -> None:
         time_input: str = input(
-            "write the time target in seconds, press enter for 20 seconds default>"
+            f"write the time target in seconds, press enter for {self.time_target} seconds default>"
         ).strip()
         if not time_input == "":
             self.time_target = int(time_input)
 
 
 class Files(StrEnum):
-    PRICES = "C:/Users/tibo/python_codes/rustats/tests/prices.parquet"
-    SUMMARY = "C:/Users/tibo/python_codes/rustats/tests/benchmark_summary.ndjson"
+    BASE_DIR = "C:/Users/tibo/python_codes/rustats/tests/data/"
+    PRICES = f"{BASE_DIR}prices.parquet"
+    PASSES = f"{BASE_DIR}passes.ndjson"
+    BENCH_HISTORY = f"{BASE_DIR}bench_history.ndjson"
+    RELATIVE_HISTORY = f"{BASE_DIR}relative_history.ndjson"
 
 
 class Library(StrEnum):
@@ -39,6 +51,22 @@ class Library(StrEnum):
     BN_BENCH = f"{BOTTLENECK} - {RUSTATS}"
     NBG_BENCH = f"{NUMBAGG} - {RUSTATS_PARALLEL}"
     PL_BENCH = f"{POLARS} - {RUSTATS_PARALLEL}"
+
+
+class StatType(StrEnum):
+    MEAN = auto()
+    SUM = auto()
+    VAR = auto()
+    STD = auto()
+    MAX = auto()
+    MIN = auto()
+    MEDIAN = auto()
+    RANK = auto()
+    SKEW = auto()
+    KURT = auto()
+
+
+TEMPLATE = "plotly_dark"
 
 
 COLORS: dict[Library, str] = {
@@ -55,85 +83,30 @@ COLORS_BENCH: dict[Library, str] = {
     Library.PL_BENCH: "white",
 }
 
-StatType = Literal[
-    "mean",
-    "sum",
-    "var",
-    "std",
-    "max",
-    "min",
-    "median",
-    "rank",
-    "skew",
-    "kurt",
-]
+
+RESULT_SCHEMA = {
+    ColNames.LIBRARY.value: pl.String,
+    ColNames.GROUP.value: pl.String,
+    ColNames.TIME_MS.value: pl.Float64,
+}
+
+HISTORY_SCHEMA = {
+    ColNames.GROUP.value: pl.String,
+    ColNames.LIBRARY.value: pl.String,
+    ColNames.VERSION.value: pl.String,
+    "median_time": pl.Float64,
+    ColNames.TIME_TARGET.value: pl.Int32,
+}
+
+PASSES_SCHEMA = {
+    ColNames.GROUP.value: pl.String,
+    "total_time_secs": pl.Float64,
+    "n_passes": pl.Int64,
+    "time_per_pass_ms": pl.Float64,
+}
 
 
 class Result(NamedTuple):
     library: Library
     group: str
     time: float
-
-
-class StatFuncProtocol(Protocol):
-    library: Library
-
-    def __call__(self, config: BenchmarkConfig) -> Any: ...
-
-
-class StatFunc[T: NDArray[np.float64] | pl.DataFrame]:
-    library: Library
-
-    def __init__(
-        self,
-        func: Callable[..., T],
-    ) -> None:
-        self.func = func
-        self.results: list[Result] = []
-
-    def __call__(self, config: BenchmarkConfig) -> T: ...
-
-
-class BnFunc(StatFunc[NDArray[np.float64]]):
-    library = Library.BOTTLENECK
-
-    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
-        return self.func(
-            config.array,
-            window=config.length,
-            min_count=config.min_length,
-            axis=config.axis,
-        )
-
-
-class NbgFunc(StatFunc[NDArray[np.float64]]):
-    library = Library.NUMBAGG
-
-    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
-        return self.func(
-            config.array,
-            window=config.length,
-            min_count=config.min_length,
-            axis=config.axis,
-        )
-
-
-class PlFunc(StatFunc[pl.DataFrame]):
-    library = Library.POLARS
-
-    def __call__(self, config: BenchmarkConfig) -> pl.DataFrame:
-        return self.func(config.df, length=config.length, min_length=config.min_length)
-
-
-class RSingleFunc(StatFunc[NDArray[np.float64]]):
-    library = Library.RUSTATS
-
-    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
-        return self.func(config.array, config.length, config.min_length, False)
-
-
-class RParallelFunc(StatFunc[NDArray[np.float64]]):
-    library = Library.RUSTATS_PARALLEL
-
-    def __call__(self, config: BenchmarkConfig) -> NDArray[np.float64]:
-        return self.func(config.array, config.length, config.min_length, True)

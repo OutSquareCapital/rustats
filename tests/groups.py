@@ -1,9 +1,9 @@
-from structs import StatType
-from manager import FuncGroup
 import funcs as fn
+from manager import FuncGroup
+from structs import StatType
 
 ROLLING_FUNCS: dict[StatType, FuncGroup] = {
-    "mean": FuncGroup(
+    StatType.MEAN: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.mean,
             fn.RustatSingleFuncs.mean,
@@ -12,7 +12,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.mean,
         ],
     ),
-    "sum": FuncGroup(
+    StatType.SUM: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.sum,
             fn.RustatSingleFuncs.sum,
@@ -21,7 +21,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.sum,
         ],
     ),
-    "var": FuncGroup(
+    StatType.VAR: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.var,
             fn.RustatSingleFuncs.var,
@@ -30,7 +30,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.var,
         ],
     ),
-    "std": FuncGroup(
+    StatType.STD: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.std,
             fn.RustatSingleFuncs.std,
@@ -39,7 +39,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.std,
         ],
     ),
-    "max": FuncGroup(
+    StatType.MAX: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.max,
             fn.RustatSingleFuncs.max,
@@ -47,7 +47,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.max,
         ],
     ),
-    "min": FuncGroup(
+    StatType.MIN: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.min,
             fn.RustatSingleFuncs.min,
@@ -55,7 +55,7 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.min,
         ],
     ),
-    "median": FuncGroup(
+    StatType.MEDIAN: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.median,
             fn.RustatSingleFuncs.median,
@@ -63,21 +63,21 @@ ROLLING_FUNCS: dict[StatType, FuncGroup] = {
             fn.PolarsFunc.median,
         ],
     ),
-    "rank": FuncGroup(
+    StatType.RANK: FuncGroup(
         funcs=[
             fn.BottleneckFuncs.rank,
             fn.RustatSingleFuncs.rank,
             fn.RustatParallelFuncs.rank,
         ],
     ),
-    "skew": FuncGroup(
+    StatType.SKEW: FuncGroup(
         funcs=[
             fn.RustatSingleFuncs.skew,
             fn.RustatParallelFuncs.skew,
             fn.PolarsFunc.skew,
         ],
     ),
-    "kurt": FuncGroup(
+    StatType.KURT: FuncGroup(
         funcs=[
             fn.RustatSingleFuncs.kurt,
             fn.RustatParallelFuncs.kurt,
