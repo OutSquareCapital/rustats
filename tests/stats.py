@@ -1,20 +1,19 @@
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-
 from structs import (
-    HISTORY_SCHEMA,
-    PASSES_SCHEMA,
+    Schemas,
     BenchmarkConfig,
     ColNames,
     Files,
     Library,
     Result,
+    StatType,
 )
 
 
-def get_n_passes(time_target: float, group_name: str) -> int:
-    group_data = pl.read_ndjson(Files.PASSES, schema=PASSES_SCHEMA).filter(
+def get_n_passes(time_target: float, group_name: StatType) -> int:
+    group_data = pl.read_ndjson(Files.PASSES, schema=Schemas.PASSES).filter(
         pl.col(ColNames.GROUP) == group_name
     )
 
@@ -46,20 +45,25 @@ def get_formatted_results(results: list[Result]) -> pl.DataFrame:
             ColNames.TIME_MS: [r.time for r in results],
         },
         orient="row",
+        schema=Schemas.RESULT,
     )
 
 
-def save_total_time(group_name: str, results: list[Result], n_passes: int) -> None:
+def save_total_time(
+    group_name: StatType, results: list[Result], n_passes: int, config: BenchmarkConfig
+) -> None:
     new_data = pl.DataFrame(
         data={
-            ColNames.GROUP: group_name,
+            ColNames.GROUP: pl.lit(group_name, dtype=Schemas.library_enum),
+            ColNames.VERSION: pl.lit(config.version, dtype=pl.Int32),
+            ColNames.TIME_TARGET: pl.lit(config.time_target, dtype=pl.Int32),
             "total_time_secs": round(sum(r.time for r in results) / 1000, 3),
             "n_passes": n_passes,
             "time_per_pass_ms": round(sum(r.time for r in results) / n_passes, 3),
         }
     )
 
-    pl.read_ndjson(Files.PASSES, schema=PASSES_SCHEMA).filter(
+    pl.read_ndjson(Files.PASSES, schema=Schemas.PASSES).filter(
         pl.col(ColNames.GROUP) != group_name
     ).vstack(new_data).write_ndjson(Files.PASSES)
 
@@ -68,9 +72,7 @@ def get_data_check(results: dict[Library, NDArray[np.float64]]) -> pl.DataFrame:
     return pl.DataFrame(
         {
             ColNames.LIBRARY: [
-                lib.value
-                for lib in results.keys()
-                for _ in range(results[lib].shape[0])
+                lib for lib in results.keys() for _ in range(results[lib].shape[0])
             ],
             "Index": [
                 i for lib in results.keys() for i in range(results[lib].shape[0])
@@ -93,8 +95,8 @@ def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
 def get_time_results(df: pl.DataFrame, config: BenchmarkConfig) -> pl.DataFrame:
     return (
         df.with_columns(
-            pl.lit(value=config.version_nb).alias(ColNames.VERSION),
-            pl.lit(value=config.time_target, dtype=pl.UInt16).alias(
+            pl.lit(value=config.version, dtype=pl.Int32).alias(ColNames.VERSION),
+            pl.lit(value=config.time_target, dtype=pl.Int32).alias(
                 ColNames.TIME_TARGET
             ),
         )
@@ -109,7 +111,7 @@ def get_time_results(df: pl.DataFrame, config: BenchmarkConfig) -> pl.DataFrame:
 def save_time_results(df: pl.DataFrame, config: BenchmarkConfig, file: str) -> None:
     new_results = get_time_results(df, config)
     existing_data = (
-        pl.read_ndjson(file, schema=HISTORY_SCHEMA)
+        pl.read_ndjson(file, schema=Schemas.HISTORY)
         .join(
             new_results.select(
                 [
@@ -155,4 +157,5 @@ def get_time_diff(df: pl.DataFrame) -> pl.DataFrame:
             value_name=ColNames.TIME_MS,
             variable_name=ColNames.LIBRARY,
         )
+        .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
     )

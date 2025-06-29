@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 import stats as st
 from funcs import StatFuncProtocol
-from structs import RESULT_SCHEMA, BenchmarkConfig, Result, StatType
+from structs import Schemas, BenchmarkConfig, Result, StatType
 
 
 @dataclass(slots=True)
@@ -50,7 +50,9 @@ class BenchmarkManager:
                     )
                     pbar.update(1)
 
-        st.save_total_time(group_name=group_name, results=results, n_passes=n_passes)
+        st.save_total_time(
+            group_name=group_name, results=results, n_passes=n_passes, config=config
+        )
         return st.get_formatted_results(results=results)
 
     def get_perf_for_all_groups(self, config: BenchmarkConfig) -> pl.DataFrame:
@@ -92,5 +94,5 @@ class BenchmarkManager:
                 "Group": [result.group for result in combined_results],
                 "Time (ms)": [result.time for result in combined_results],
             },
-            schema=RESULT_SCHEMA,
+            schema=Schemas.RESULT,
         )

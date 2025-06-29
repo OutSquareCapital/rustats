@@ -2,12 +2,12 @@ from groups import ROLLING_FUNCS, StatType
 import stats as st
 import polars as pl
 from plots import (
-    BenchmarkManager,
     plot_global_bench,
     plot_benchmark_results,
     plot_check,
 )
 from structs import Files, BenchmarkConfig
+from manager import BenchmarkManager
 
 
 def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
@@ -42,7 +42,7 @@ def _get_group_name(manager: BenchmarkManager) -> StatType:
         print(f"Group '{group_name}' not found.")
         return _get_group_name(manager=manager)
     else:
-        return StatType[group_name]
+        return StatType[group_name.upper()]
 
 
 def _display_menu() -> None:

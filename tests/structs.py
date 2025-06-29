@@ -22,9 +22,13 @@ class BenchmarkConfig:
     min_length: int = 25
     length: int = 250
     axis: int = 0
-    time_target: int = 20
+    time_target: int = 30
     limit: float = 0.95
-    version_nb = metadata.version("rustats")
+
+    @property
+    def version(self) -> int:
+        version_str: str = metadata.version("rustats")
+        return int(version_str.split(".")[-1])
 
     def set_time_target(self) -> None:
         time_input: str = input(
@@ -66,47 +70,53 @@ class StatType(StrEnum):
     KURT = auto()
 
 
-TEMPLATE = "plotly_dark"
+class Colors:
+    TEMPLATE = "plotly_dark"
+
+    ABSOLUTE: dict[Library, str] = {
+        Library.RUSTATS: "yellow",
+        Library.RUSTATS_PARALLEL: "red",
+        Library.NUMBAGG: "cyan",
+        Library.BOTTLENECK: "lime",
+        Library.POLARS: "white",
+    }
+
+    RELATIVE: dict[Library, str] = {
+        Library.BN_BENCH: "lime",
+        Library.NBG_BENCH: "cyan",
+        Library.PL_BENCH: "white",
+    }
 
 
-COLORS: dict[Library, str] = {
-    Library.RUSTATS: "yellow",
-    Library.RUSTATS_PARALLEL: "red",
-    Library.NUMBAGG: "cyan",
-    Library.BOTTLENECK: "lime",
-    Library.POLARS: "white",
-}
+class Schemas:
+    stat_enum = pl.Enum(StatType)
+    library_enum = pl.Enum(Library)
 
-COLORS_BENCH: dict[Library, str] = {
-    Library.BN_BENCH: "lime",
-    Library.NBG_BENCH: "cyan",
-    Library.PL_BENCH: "white",
-}
+    RESULT = {
+        ColNames.LIBRARY.value: library_enum,
+        ColNames.GROUP.value: stat_enum,
+        ColNames.TIME_MS.value: pl.Float64,
+    }
 
+    HISTORY = {
+        ColNames.GROUP.value: stat_enum,
+        ColNames.LIBRARY.value: library_enum,
+        ColNames.VERSION.value: pl.Int32,
+        "median_time": pl.Float64,
+        ColNames.TIME_TARGET.value: pl.Int32,
+    }
 
-RESULT_SCHEMA = {
-    ColNames.LIBRARY.value: pl.String,
-    ColNames.GROUP.value: pl.String,
-    ColNames.TIME_MS.value: pl.Float64,
-}
-
-HISTORY_SCHEMA = {
-    ColNames.GROUP.value: pl.String,
-    ColNames.LIBRARY.value: pl.String,
-    ColNames.VERSION.value: pl.String,
-    "median_time": pl.Float64,
-    ColNames.TIME_TARGET.value: pl.Int32,
-}
-
-PASSES_SCHEMA = {
-    ColNames.GROUP.value: pl.String,
-    "total_time_secs": pl.Float64,
-    "n_passes": pl.Int64,
-    "time_per_pass_ms": pl.Float64,
-}
+    PASSES = {
+        ColNames.GROUP.value: stat_enum,
+        ColNames.VERSION.value: pl.Int32,
+        ColNames.TIME_TARGET.value: pl.Int32,
+        "total_time_secs": pl.Float64,
+        "n_passes": pl.Int64,
+        "time_per_pass_ms": pl.Float64,
+    }
 
 
 class Result(NamedTuple):
     library: Library
-    group: str
+    group: StatType
     time: float
