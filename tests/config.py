@@ -12,7 +12,7 @@ TIME_DEFAULT = 30
 
 def set_time_target() -> int:
     time_input: str = input(
-        f"write the time target in seconds, press enter for {TIME_DEFAULT} seconds default>"
+        f"write the time target in seconds, press enter for {TIME_DEFAULT} seconds default> "
     ).strip()
     if not time_input == "":
         return int(time_input)
@@ -45,7 +45,7 @@ class ChronoBar:
             sys.stdout.write(f"\r⏱️  Elapsed: {elapsed:.1f}s | Left: {left:.1f}s")
             sys.stdout.flush()
             if elapsed >= self.time_target:
-                print("Done!")
+                print("\nDone!")
                 break
             time.sleep(1)
 

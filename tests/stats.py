@@ -151,9 +151,15 @@ def save_history(
             how="anti",
         )
 
-    pl.concat([current_data, data_to_add]).sort(
-        by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]
-    ).write_ndjson(file)
+    pl.concat([current_data, data_to_add]).unique(
+        subset=[
+            ColNames.GROUP,
+            ColNames.LIBRARY,
+            ColNames.VERSION,
+            ColNames.TIME_TARGET,
+            ColNames.MEDIAN_TIME,
+        ]
+    ).sort(by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]).write_ndjson(file)
 
 
 def get_time_results(

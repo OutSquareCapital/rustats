@@ -63,6 +63,19 @@ def plot_global_bench(
     _plot_relative_results(df=bench)
 
 
+def plot_3d_history(file: Files, log_scale: bool) -> None:
+    px.scatter_3d(  # type: ignore
+        pl.read_ndjson(file),
+        x=ColNames.GROUP,
+        y=ColNames.VERSION,
+        z=ColNames.MEDIAN_TIME,
+        color=ColNames.LIBRARY,
+        title="3D Scatter Plot of Benchmark History",
+        log_z=log_scale,
+        template=Colors.TEMPLATE,
+    ).show()
+
+
 def _plot_absolute_results(df: pl.DataFrame) -> None:
     px.histogram(  # type: ignore
         df,
