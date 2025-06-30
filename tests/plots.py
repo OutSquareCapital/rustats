@@ -24,7 +24,15 @@ def plot_check(
             func.library: func(config) for func in manager.groups[group_name].funcs
         }
     )
-    _plot_func_result(df=df, group_name=group_name)
+    px.line(  # type: ignore
+        df,
+        x="Index",
+        y="Values",
+        color=ColNames.LIBRARY,
+        title=f"Results Check - {group_name}",
+        template=Colors.TEMPLATE,
+        color_discrete_map=Colors.ABSOLUTE,
+    ).show()
 
 
 def plot_benchmark_results(
@@ -64,13 +72,14 @@ def plot_global_bench(
 
 
 def plot_3d_history(file: Files, log_scale: bool) -> None:
-    px.scatter_3d(  # type: ignore
-        pl.read_ndjson(file),
+    px.line_3d(  # type: ignore
+        st.get_perf_across_versions(file=file),
         x=ColNames.GROUP,
         y=ColNames.VERSION,
         z=ColNames.MEDIAN_TIME,
-        color=ColNames.LIBRARY,
-        title="3D Scatter Plot of Benchmark History",
+        color=ColNames.FUNC_LIB,
+        line_group=ColNames.FUNC_LIB,
+        title="3D Line Plot of Benchmark History",
         log_z=log_scale,
         template=Colors.TEMPLATE,
     ).show()
@@ -139,21 +148,6 @@ def _plot_iterations(df: pl.DataFrame, group_name: StatType) -> None:
         y=ColNames.TIME_MS,
         color=ColNames.LIBRARY,
         title=f"Performance Comparison - {group_name} (Line Plot)",
-        template=Colors.TEMPLATE,
-        color_discrete_map=Colors.ABSOLUTE,
-    ).show()
-
-
-def _plot_func_result(
-    df: pl.DataFrame,
-    group_name: str,
-) -> None:
-    px.line(  # type: ignore
-        df,
-        x="Index",
-        y="Values",
-        color=ColNames.LIBRARY,
-        title=f"Results Check - {group_name}",
         template=Colors.TEMPLATE,
         color_discrete_map=Colors.ABSOLUTE,
     ).show()

@@ -29,7 +29,8 @@ def get_n_passes(time_target: int, group_name: StatType) -> int:
 
 def get_array(file: Files) -> NDArray[np.float64]:
     return (
-        pl.read_parquet(file).pivot(
+        pl.read_parquet(file)
+        .pivot(
             on="ticker",
             index="date",
             values="pct_return",
@@ -218,5 +219,19 @@ def get_time_relative(df: pl.DataFrame) -> pl.DataFrame:
             .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
         )
         .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
+        .collect()
+    )
+
+
+def get_perf_across_versions(file: Files) -> pl.DataFrame:
+    return (
+        pl.scan_ndjson(file)
+        .with_columns(
+            (
+                pl.col(ColNames.GROUP).cast(pl.String)
+                + "_"
+                + pl.col(ColNames.LIBRARY).cast(pl.String)
+            ).alias(ColNames.FUNC_LIB)
+        )
         .collect()
     )

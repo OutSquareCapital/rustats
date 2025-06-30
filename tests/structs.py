@@ -10,6 +10,7 @@ class ColNames(StrEnum):
     VERSION = auto()
     TIME_TARGET = auto()
     MEDIAN_TIME = auto()
+    FUNC_LIB = auto()
 
 
 class Files(StrEnum):
