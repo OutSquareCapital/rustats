@@ -85,6 +85,17 @@ def plot_3d_history(file: Files, log_scale: bool) -> None:
     ).show()
 
 
+def plot_2d_history(file: Files, log_scale: bool, group: StatType) -> None:
+    px.line(  # type: ignore
+        st.get_perf_across_versions(file=file, group=group),
+        x=ColNames.VERSION,
+        y=ColNames.MEDIAN_TIME,
+        color=ColNames.LIBRARY,
+        title=f"Line Plot of {group} Benchmark History",
+        log_y=log_scale,
+        template=Colors.TEMPLATE,
+    ).show()
+
 def _plot_absolute_results(df: pl.DataFrame) -> None:
     px.histogram(  # type: ignore
         df,

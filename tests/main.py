@@ -39,6 +39,14 @@ def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
                 pt.plot_3d_history(file=Files.BENCH_HISTORY, log_scale=True)
                 pt.plot_3d_history(file=Files.RELATIVE_HISTORY, log_scale=False)
             case "5":
+                group_name = _get_group_name(manager=manager)
+                pt.plot_2d_history(
+                    file=Files.BENCH_HISTORY, log_scale=True, group=group_name
+                )
+                pt.plot_2d_history(
+                    file=Files.RELATIVE_HISTORY, log_scale=False, group=group_name
+                )
+            case "6":
                 print("Exiting...")
                 break
             case _:
@@ -59,8 +67,9 @@ def _display_menu() -> None:
     print("1. Perform a global performance test for all groups")
     print("2. Test performance for a specific group")
     print("3. Check results for a specific group")
-    print("4. View performance history across versions")
-    print("5. Exit")
+    print("4. View global performance history across versions")
+    print("5. View specific group performance history across versions")
+    print("6. Exit")
 
 
 if __name__ == "__main__":

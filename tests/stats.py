@@ -223,8 +223,10 @@ def get_time_relative(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def get_perf_across_versions(file: Files) -> pl.DataFrame:
-    return (
+def get_perf_across_versions(
+    file: Files, group: StatType | None = None
+) -> pl.DataFrame:
+    df = (
         pl.scan_ndjson(file)
         .with_columns(
             (
@@ -233,5 +235,9 @@ def get_perf_across_versions(file: Files) -> pl.DataFrame:
                 + pl.col(ColNames.LIBRARY).cast(pl.String)
             ).alias(ColNames.FUNC_LIB)
         )
-        .collect()
+        .sort(by=[ColNames.FUNC_LIB, ColNames.VERSION])
     )
+    if group is not None:
+        df = df.filter(pl.col(ColNames.GROUP) == group)
+
+    return df.collect()
