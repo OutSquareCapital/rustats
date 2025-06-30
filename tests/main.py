@@ -6,10 +6,9 @@ from plots import (
     plot_benchmark_results,
     plot_check,
 )
-from structs import Files, BenchmarkConfig
+from structs import Files
+from config import BenchmarkConfig, ChronoBar, set_time_target
 from manager import BenchmarkManager
-
-TIME_DEFAULT = 30
 
 
 def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
@@ -18,19 +17,25 @@ def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
         choice: str = input("Enter your choice (1-4)> ").strip()
         match choice:
             case "1":
-                time_target = _set_time_target()
+                time_target = set_time_target()
+                bar = ChronoBar(time_target=time_target)
+                bar.start()
                 plot_global_bench(
                     manager=manager, config=config, time_target=time_target
                 )
+                bar.stop()
             case "2":
                 group_name: str = _get_group_name(manager=manager)
-                time_target = _set_time_target()
+                time_target = set_time_target()
+                bar = ChronoBar(time_target=time_target)
+                bar.start()
                 plot_benchmark_results(
                     config=config,
                     manager=manager,
                     group_name=group_name,
                     time_target=time_target,
                 )
+                bar.stop()
             case "3":
                 group_name = _get_group_name(manager=manager)
                 plot_check(config=config, manager=manager, group_name=group_name)
@@ -56,16 +61,6 @@ def _display_menu() -> None:
     print("2. Test performance for a specific group")
     print("3. Check results for a specific group")
     print("4. Exit")
-
-
-def _set_time_target() -> int:
-    time_input: str = input(
-        f"write the time target in seconds, press enter for {TIME_DEFAULT} seconds default>"
-    ).strip()
-    if not time_input == "":
-        return int(time_input)
-    else:
-        return TIME_DEFAULT
 
 
 if __name__ == "__main__":

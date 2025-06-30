@@ -7,11 +7,11 @@ import stats as st
 from manager import BenchmarkManager
 from structs import (
     Colors,
-    BenchmarkConfig,
     ColNames,
     Files,
     StatType,
 )
+from config import BenchmarkConfig
 
 
 def plot_check(

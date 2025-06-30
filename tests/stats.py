@@ -3,13 +3,13 @@ import polars as pl
 from numpy.typing import NDArray
 from structs import (
     Schemas,
-    BenchmarkConfig,
     ColNames,
     Files,
     Library,
     Result,
     StatType,
 )
+from config import BenchmarkConfig
 
 
 def get_n_passes(time_target: int, group_name: StatType) -> int:
@@ -110,7 +110,9 @@ def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
     )
 
 
-def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str, time_target: int) -> None:
+def save_history(
+    df: pl.DataFrame, config: BenchmarkConfig, file: str, time_target: int
+) -> None:
     current_data = pl.read_ndjson(file, schema=Schemas.HISTORY)
 
     new_data = get_time_results(df, config, time_target)
@@ -154,13 +156,13 @@ def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str, time_targ
     ).write_ndjson(file)
 
 
-def get_time_results(df: pl.DataFrame, config: BenchmarkConfig, time_target: int) -> pl.DataFrame:
+def get_time_results(
+    df: pl.DataFrame, config: BenchmarkConfig, time_target: int
+) -> pl.DataFrame:
     return (
         df.with_columns(
             pl.lit(value=config.version, dtype=pl.Int32).alias(ColNames.VERSION),
-            pl.lit(value=time_target, dtype=pl.Int32).alias(
-                ColNames.TIME_TARGET
-            ),
+            pl.lit(value=time_target, dtype=pl.Int32).alias(ColNames.TIME_TARGET),
         )
         .group_by(
             [ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION, ColNames.TIME_TARGET]

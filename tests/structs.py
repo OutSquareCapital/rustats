@@ -1,10 +1,7 @@
 from enum import StrEnum, auto
 from typing import NamedTuple
-import numpy as np
-from dataclasses import dataclass
-from importlib import metadata
-from numpy.typing import NDArray
 import polars as pl
+
 
 class ColNames(StrEnum):
     GROUP = "Group"
@@ -14,20 +11,6 @@ class ColNames(StrEnum):
     TIME_TARGET = auto()
     MEDIAN_TIME = auto()
 
-
-@dataclass(slots=True)
-class BenchmarkConfig:
-    array: NDArray[np.float64]
-    df: pl.DataFrame
-    min_length: int = 25
-    length: int = 250
-    axis: int = 0
-    limit: float = 0.95
-
-    @property
-    def version(self) -> int:
-        version_str: str = metadata.version("rustats")
-        return int(version_str.split(".")[-1])
 
 class Files(StrEnum):
     BASE_DIR = "C:/Users/tibo/python_codes/rustats/tests/data/"

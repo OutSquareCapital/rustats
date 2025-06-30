@@ -9,7 +9,8 @@ import polars as pl
 import rustats as rs
 from numpy.typing import NDArray
 
-from structs import BenchmarkConfig, Library
+from structs import Library
+from config import BenchmarkConfig
 
 
 class StatFuncProtocol(Protocol):
