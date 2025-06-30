@@ -5,7 +5,6 @@ import stats as st
 from funcs import StatFuncProtocol
 from structs import BenchmarkConfig, Result, StatType
 
-
 @dataclass(slots=True)
 class FuncGroup:
     funcs: list[StatFuncProtocol]

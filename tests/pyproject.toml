@@ -16,7 +16,6 @@ dependencies = [
     "polars>=1.8.2",
     "pyarrow>=20.0.0",
     "rustats",
-    "tqdm>=4.67.1",
 ]
 
 [tool.uv.sources]
