@@ -1,19 +1,19 @@
 #[inline(always)]
-pub fn var(sum_simple: f64, sum_squared: f64, obs: f64) -> f64 {
-    (sum_squared / obs - (sum_simple / obs).powi(2)) * (obs / (obs - 1.0))
+pub fn var(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
+    (sum_square / obs - (sum_simple / obs).powi(2)) * (obs / (obs - 1.0))
 }
 
 #[inline(always)]
-pub fn stdev(sum_simple: f64, sum_squared: f64, obs: f64) -> f64 {
-    var(sum_simple, sum_squared, obs).sqrt()
+pub fn stdev(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
+    var(sum_simple, sum_square, obs).sqrt()
 }
 
 #[inline(always)]
-pub fn skew(sum_simple: f64, sum_squared: f64, sum_cubed: f64, obs: f64) -> f64 {
+pub fn skew(sum_simple: f64, sum_square: f64, sum_cube: f64, obs: f64) -> f64 {
     let mean_value: f64 = sum_simple / obs;
-    let variance_value: f64 = var(sum_simple, sum_squared, obs);
+    let variance_value: f64 = var(sum_simple, sum_square, obs);
     let skew_numerator: f64 =
-        sum_cubed / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
+        sum_cube / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
 
     let std_dev: f64 = variance_value.sqrt();
 
@@ -22,11 +22,11 @@ pub fn skew(sum_simple: f64, sum_squared: f64, sum_cubed: f64, obs: f64) -> f64 
 }
 
 #[inline(always)]
-pub fn kurtosis(sum_simple: f64, sum_squared: f64, sum_cubed: f64, sum_quad: f64, obs: f64) -> f64 {
+pub fn kurtosis(sum_simple: f64, sum_square: f64, sum_cube: f64, sum_quad: f64, obs: f64) -> f64 {
     let mean_value: f64 = sum_simple / obs;
-    let variance_value: f64 = var(sum_simple, sum_squared, obs);
+    let variance_value: f64 = var(sum_simple, sum_square, obs);
     let skew_numerator: f64 =
-        sum_cubed / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
+        sum_cube / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
 
     let kurtosis_term: f64 =
         sum_quad / obs -
