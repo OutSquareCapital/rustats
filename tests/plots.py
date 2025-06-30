@@ -28,26 +28,37 @@ def plot_check(
 
 
 def plot_benchmark_results(
-    config: BenchmarkConfig, manager: BenchmarkManager, group_name: StatType
+    config: BenchmarkConfig,
+    manager: BenchmarkManager,
+    group_name: StatType,
+    time_target: int,
 ) -> None:
-    avg_data: pl.DataFrame = manager.get_perf_for_group(
-        config=config, group_name=group_name
+    results = manager.get_perf_for_group(
+        config=config, group_name=group_name, time_target=time_target
     )
+    avg_data = st.get_formatted_results(results=results)
     distribution_data = st.get_data_distribution(df=avg_data, limit=config.limit)
-    line_data = avg_data.with_columns(
-        pl.arange(0, avg_data.height, 1).alias("Iteration")
-    )
+    line_data = avg_data.with_columns(pl.arange(0, len(results), 1).alias("Iteration"))
     _plot_group_bench(df=distribution_data, group_name=group_name, kind="box")
     _plot_group_bench(df=distribution_data, group_name=group_name, kind="violins")
     _plot_iterations(df=line_data, group_name=group_name)
 
 
-def plot_global_bench(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
-    combined_results = manager.get_perf_for_all_groups(config=config)
-    bench = st.get_time_relative(combined_results)
-    st.save_history(df=combined_results, config=config, file=Files.BENCH_HISTORY)
-    st.save_history(df=bench, config=config, file=Files.RELATIVE_HISTORY)
-    _plot_absolute_results(df=combined_results)
+def plot_global_bench(
+    manager: BenchmarkManager, config: BenchmarkConfig, time_target: int
+) -> None:
+    combined_results = manager.get_perf_for_all_groups(
+        config=config, time_target=time_target
+    )
+    df = st.get_formatted_results(results=combined_results)
+    bench = st.get_time_relative(df)
+    st.save_history(
+        df=df, config=config, file=Files.BENCH_HISTORY, time_target=time_target
+    )
+    st.save_history(
+        df=bench, config=config, file=Files.RELATIVE_HISTORY, time_target=time_target
+    )
+    _plot_absolute_results(df=df)
     _plot_relative_results(df=bench)
 
 

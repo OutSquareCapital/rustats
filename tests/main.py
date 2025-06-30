@@ -9,6 +9,8 @@ from plots import (
 from structs import Files, BenchmarkConfig
 from manager import BenchmarkManager
 
+TIME_DEFAULT = 30
+
 
 def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
     while True:
@@ -16,15 +18,18 @@ def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
         choice: str = input("Enter your choice (1-4)> ").strip()
         match choice:
             case "1":
-                config.set_time_target()
-                plot_global_bench(manager=manager, config=config)
+                time_target = _set_time_target()
+                plot_global_bench(
+                    manager=manager, config=config, time_target=time_target
+                )
             case "2":
                 group_name: str = _get_group_name(manager=manager)
-                config.set_time_target()
+                time_target = _set_time_target()
                 plot_benchmark_results(
                     config=config,
                     manager=manager,
                     group_name=group_name,
+                    time_target=time_target,
                 )
             case "3":
                 group_name = _get_group_name(manager=manager)
@@ -51,6 +56,16 @@ def _display_menu() -> None:
     print("2. Test performance for a specific group")
     print("3. Check results for a specific group")
     print("4. Exit")
+
+
+def _set_time_target() -> int:
+    time_input: str = input(
+        f"write the time target in seconds, press enter for {TIME_DEFAULT} seconds default>"
+    ).strip()
+    if not time_input == "":
+        return int(time_input)
+    else:
+        return TIME_DEFAULT
 
 
 if __name__ == "__main__":

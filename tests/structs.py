@@ -6,7 +6,6 @@ from importlib import metadata
 from numpy.typing import NDArray
 import polars as pl
 
-
 class ColNames(StrEnum):
     GROUP = "Group"
     TIME_MS = "Time (ms)"
@@ -23,21 +22,12 @@ class BenchmarkConfig:
     min_length: int = 25
     length: int = 250
     axis: int = 0
-    time_target: int = 30
     limit: float = 0.95
 
     @property
     def version(self) -> int:
         version_str: str = metadata.version("rustats")
         return int(version_str.split(".")[-1])
-
-    def set_time_target(self) -> None:
-        time_input: str = input(
-            f"write the time target in seconds, press enter for {self.time_target} seconds default>"
-        ).strip()
-        if not time_input == "":
-            self.time_target = int(time_input)
-
 
 class Files(StrEnum):
     BASE_DIR = "C:/Users/tibo/python_codes/rustats/tests/data/"

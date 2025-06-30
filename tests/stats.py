@@ -50,13 +50,17 @@ def get_formatted_results(results: list[Result]) -> pl.DataFrame:
 
 
 def save_group_time(
-    group_name: StatType, results: list[Result], n_passes: int, config: BenchmarkConfig
+    group_name: StatType,
+    results: list[Result],
+    config: BenchmarkConfig,
+    n_passes: int,
+    time_target: int,
 ) -> None:
     new_data = pl.DataFrame(
         data={
             ColNames.GROUP: group_name,
             ColNames.VERSION: config.version,
-            ColNames.TIME_TARGET: config.time_target,
+            ColNames.TIME_TARGET: time_target,
             "total_time_secs": round(sum(r.time for r in results) / 1000, 3),
             "n_passes": n_passes,
             "time_per_pass_ms": round(sum(r.time for r in results) / n_passes, 3),
@@ -71,7 +75,7 @@ def save_group_time(
                 (pl.col(ColNames.VERSION) < config.version)
                 | (
                     (pl.col(ColNames.VERSION) == config.version)
-                    & (pl.col(ColNames.TIME_TARGET) <= config.time_target)
+                    & (pl.col(ColNames.TIME_TARGET) <= time_target)
                 )
             )
         )
@@ -106,10 +110,10 @@ def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
     )
 
 
-def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str) -> None:
+def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str, time_target: int) -> None:
     current_data = pl.read_ndjson(file, schema=Schemas.HISTORY)
 
-    new_data = get_time_results(df, config)
+    new_data = get_time_results(df, config, time_target)
 
     data_to_add = (
         new_data.join(
@@ -150,11 +154,11 @@ def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str) -> None:
     ).write_ndjson(file)
 
 
-def get_time_results(df: pl.DataFrame, config: BenchmarkConfig) -> pl.DataFrame:
+def get_time_results(df: pl.DataFrame, config: BenchmarkConfig, time_target: int) -> pl.DataFrame:
     return (
         df.with_columns(
             pl.lit(value=config.version, dtype=pl.Int32).alias(ColNames.VERSION),
-            pl.lit(value=config.time_target, dtype=pl.Int32).alias(
+            pl.lit(value=time_target, dtype=pl.Int32).alias(
                 ColNames.TIME_TARGET
             ),
         )
