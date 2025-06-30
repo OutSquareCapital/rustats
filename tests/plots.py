@@ -34,7 +34,7 @@ def plot_check(
     ).show()
 
 
-def plot_benchmark_results(
+def plot_group_bench(
     config: BenchmarkConfig,
     manager: BenchmarkManager,
     group_name: StatType,
@@ -43,11 +43,37 @@ def plot_benchmark_results(
     results = manager.get_perf_for_group(
         config=config, group_name=group_name, time_target=time_target
     )
-    avg_data = st.get_formatted_results(results=results)
-    distribution_data = st.get_data_distribution(df=avg_data, limit=config.limit)
-    line_data = avg_data.with_columns(pl.arange(0, len(results), 1).alias("Iteration"))
-    _plot_group_bench(df=distribution_data, group_name=group_name, kind="box")
-    _plot_group_bench(df=distribution_data, group_name=group_name, kind="violins")
+    absolute = st.get_formatted_results(results=results)
+    relative = st.get_time_relative(absolute)
+    abs_distribution = st.get_data_distribution(df=absolute.lazy(), limit=config.limit)
+    relative_distribution = st.get_data_distribution(
+        df=relative.lazy(), limit=config.limit
+    )
+    st.save_history(
+        df=absolute,
+        config=config,
+        file=Files.BENCH_HISTORY,
+        time_target=time_target,
+    )
+    st.save_history(
+        df=relative,
+        config=config,
+        file=Files.RELATIVE_HISTORY,
+        time_target=time_target,
+    )
+    line_data = absolute.with_columns(pl.arange(0, len(results), 1).alias("Iteration"))
+    _plot_group_bench(
+        df=abs_distribution, group_name=group_name, kind="box", log_scale=True
+    )
+    _plot_group_bench(
+        df=abs_distribution, group_name=group_name, kind="violins", log_scale=True
+    )
+    _plot_group_bench(
+        df=relative_distribution, group_name=group_name, kind="box", log_scale=False
+    )
+    _plot_group_bench(
+        df=relative_distribution, group_name=group_name, kind="violins", log_scale=False
+    )
     _plot_iterations(df=line_data, group_name=group_name)
 
 
@@ -128,6 +154,7 @@ def _plot_group_bench(
     df: pl.DataFrame,
     group_name: StatType,
     kind: Literal["box", "violins"],
+    log_scale: bool,
 ) -> None:
     match kind:
         case "box":
@@ -139,6 +166,7 @@ def _plot_group_bench(
                 title=f"Performance Comparison - {group_name}",
                 template=Colors.TEMPLATE,
                 color_discrete_map=Colors.ABSOLUTE,
+                log_y=log_scale,
             ).show()
         case "violins":
             px.violin(  # type: ignore
@@ -149,6 +177,7 @@ def _plot_group_bench(
                 violinmode="overlay",
                 template=Colors.TEMPLATE,
                 color_discrete_map=Colors.ABSOLUTE,
+                log_y=log_scale,
             ).show()
 
 

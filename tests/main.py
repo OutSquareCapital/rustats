@@ -25,7 +25,7 @@ def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
                 time_target: int = set_time_target()
                 bar = ChronoBar(time_target=time_target)
                 bar.start()
-                pt.plot_benchmark_results(
+                pt.plot_group_bench(
                     config=config,
                     manager=manager,
                     group_name=group_name,

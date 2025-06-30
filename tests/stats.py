@@ -53,7 +53,7 @@ def get_formatted_results(results: list[Result]) -> pl.DataFrame:
     )
 
 
-def save_group_time(
+def save_group_passes(
     group_name: StatType,
     results: list[Result],
     config: BenchmarkConfig,
@@ -102,13 +102,12 @@ def get_data_check(results: dict[Library, NDArray[np.float64]]) -> pl.DataFrame:
     )
 
 
-def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
+def get_data_distribution(df: pl.LazyFrame, limit: float) -> pl.DataFrame:
     return (
-        df.lazy()
-        .join(
-            df.lazy()
-            .group_by(ColNames.LIBRARY)
-            .agg(pl.col(ColNames.TIME_MS).quantile(limit).alias("limit")),
+        df.join(
+            df.group_by(ColNames.LIBRARY).agg(
+                pl.col(ColNames.TIME_MS).quantile(limit).alias("limit")
+            ),
             on=ColNames.LIBRARY,
         )
         .filter(pl.col(ColNames.TIME_MS) <= pl.col("limit"))
@@ -130,7 +129,7 @@ def save_history(
         subset=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION], keep="first"
     ).sort(
         by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]
-    ).collect().write_ndjson(file)
+    ).collect().write_ndjson(file=file)
 
 
 def _get_new_history(

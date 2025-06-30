@@ -54,7 +54,7 @@ class BenchmarkManager:
         results: list[Result] = group.get_perf(
             n_passes=n_passes, config=config, group_name=group_name
         )
-        st.save_group_time(
+        st.save_group_passes(
             group_name=group_name,
             results=results,
             n_passes=n_passes,
