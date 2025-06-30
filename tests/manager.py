@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from time import perf_counter
 
+import numpy as np
 import stats as st
-from funcs import StatFuncProtocol
-from structs import Result, StatType
 from config import BenchmarkConfig
+from funcs import StatFuncProtocol
+from numpy.typing import NDArray
+from structs import Library, Result, StatType
 
 
 @dataclass(slots=True)
@@ -73,3 +75,8 @@ class BenchmarkManager:
             )
             combined_results.extend(results)
         return combined_results
+
+    def get_results(
+        self, config: BenchmarkConfig, group_name: StatType
+    ) -> dict[Library, NDArray[np.float64]]:
+        return {func.library: func(config) for func in self.groups[group_name].funcs}

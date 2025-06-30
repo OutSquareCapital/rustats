@@ -19,9 +19,7 @@ def plot_check(
     group_name: StatType,
 ) -> None:
     df = st.get_data_check(
-        results={
-            func.library: func(config) for func in manager.groups[group_name].funcs
-        }
+        results=manager.get_results(config=config, group_name=group_name)
     )
     px.line(  # type: ignore
         df,
@@ -43,25 +41,15 @@ def plot_group_bench(
     results = manager.get_perf_for_group(
         config=config, group_name=group_name, time_target=time_target
     )
-    absolute = st.get_formatted_results(results=results)
-    relative = st.get_time_relative(absolute)
+    absolute = st.get_absolute_results(
+        results=results, config=config, time_target=time_target
+    )
+    relative = st.get_relative_results(absolute, config=config, time_target=time_target)
     abs_distribution = st.get_data_distribution(df=absolute.lazy(), limit=config.limit)
     relative_distribution = st.get_data_distribution(
         df=relative.lazy(), limit=config.limit
     )
-    st.save_history(
-        df=absolute,
-        config=config,
-        file=Files.BENCH_HISTORY,
-        time_target=time_target,
-    )
-    st.save_history(
-        df=relative,
-        config=config,
-        file=Files.RELATIVE_HISTORY,
-        time_target=time_target,
-    )
-    line_data = absolute.with_columns(pl.arange(0, len(results), 1).alias("Iteration"))
+    line_data = st.get_line_check(df=absolute, iterations=len(results))
     _plot_group_bench(
         df=abs_distribution, group_name=group_name, kind="box", log_scale=True
     )
@@ -84,16 +72,35 @@ def plot_global_bench(
     combined_results = manager.get_perf_for_all_groups(
         config=config, time_target=time_by_group
     )
-    df = st.get_formatted_results(results=combined_results)
-    bench = st.get_time_relative(df)
-    st.save_history(
-        df=df, config=config, file=Files.BENCH_HISTORY, time_target=time_by_group
+    absolute = st.get_absolute_results(
+        results=combined_results, config=config, time_target=time_by_group
     )
-    st.save_history(
-        df=bench, config=config, file=Files.RELATIVE_HISTORY, time_target=time_by_group
+    relative = st.get_relative_results(
+        absolute, config=config, time_target=time_by_group
     )
-    _plot_absolute_results(df=df)
-    _plot_relative_results(df=bench)
+    px.histogram(  # type: ignore
+        absolute,
+        x=ColNames.GROUP,
+        y=ColNames.TIME_MS,
+        color=ColNames.LIBRARY,
+        barmode="group",
+        title="Log Histogram of Average Execution Times for All Groups",
+        template=Colors.TEMPLATE,
+        log_y=True,
+        color_discrete_map=Colors.ABSOLUTE,
+        histfunc="avg",
+    ).show()
+
+    px.bar(  # type: ignore
+        relative,
+        x=ColNames.GROUP,
+        y=ColNames.TIME_MS,
+        color=ColNames.LIBRARY,
+        barmode="group",
+        title="Benchmark Comparisons (Difference in ms). Higher is better.",
+        template=Colors.TEMPLATE,
+        color_discrete_map=Colors.RELATIVE,
+    ).show()
 
 
 def plot_3d_history(file: Files, log_scale: bool) -> None:
@@ -119,34 +126,6 @@ def plot_2d_history(file: Files, log_scale: bool, group: StatType) -> None:
         title=f"Line Plot of {group} Benchmark History",
         log_y=log_scale,
         template=Colors.TEMPLATE,
-    ).show()
-
-
-def _plot_absolute_results(df: pl.DataFrame) -> None:
-    px.histogram(  # type: ignore
-        df,
-        x=ColNames.GROUP,
-        y=ColNames.TIME_MS,
-        color=ColNames.LIBRARY,
-        barmode="group",
-        title="Log Histogram of Average Execution Times for All Groups",
-        template=Colors.TEMPLATE,
-        log_y=True,
-        color_discrete_map=Colors.ABSOLUTE,
-        histfunc="avg",
-    ).show()
-
-
-def _plot_relative_results(df: pl.DataFrame) -> None:
-    px.bar(  # type: ignore
-        df,
-        x=ColNames.GROUP,
-        y=ColNames.TIME_MS,
-        color=ColNames.LIBRARY,
-        barmode="group",
-        title="Benchmark Comparisons (Difference in ms). Higher is better.",
-        template=Colors.TEMPLATE,
-        color_discrete_map=Colors.RELATIVE,
     ).show()
 
 
