@@ -12,7 +12,7 @@ from structs import (
 )
 
 
-def get_n_passes(time_target: float, group_name: StatType) -> int:
+def get_n_passes(time_target: int, group_name: StatType) -> int:
     group_data = pl.read_ndjson(Files.PASSES, schema=Schemas.PASSES).filter(
         pl.col(ColNames.GROUP) == group_name
     )
@@ -49,23 +49,33 @@ def get_formatted_results(results: list[Result]) -> pl.DataFrame:
     )
 
 
-def save_total_time(
+def save_group_time(
     group_name: StatType, results: list[Result], n_passes: int, config: BenchmarkConfig
 ) -> None:
     new_data = pl.DataFrame(
         data={
-            ColNames.GROUP: pl.lit(group_name, dtype=Schemas.library_enum),
-            ColNames.VERSION: pl.lit(config.version, dtype=pl.Int32),
-            ColNames.TIME_TARGET: pl.lit(config.time_target, dtype=pl.Int32),
+            ColNames.GROUP: group_name,
+            ColNames.VERSION: config.version,
+            ColNames.TIME_TARGET: config.time_target,
             "total_time_secs": round(sum(r.time for r in results) / 1000, 3),
             "n_passes": n_passes,
             "time_per_pass_ms": round(sum(r.time for r in results) / n_passes, 3),
-        }
+        },
+        schema=Schemas.PASSES,
     )
 
     pl.read_ndjson(Files.PASSES, schema=Schemas.PASSES).filter(
-        pl.col(ColNames.GROUP) != group_name
-    ).vstack(new_data).write_ndjson(Files.PASSES)
+        ~(
+            (pl.col(ColNames.GROUP) == group_name)
+            & (
+                (pl.col(ColNames.VERSION) < config.version)
+                | (
+                    (pl.col(ColNames.VERSION) == config.version)
+                    & (pl.col(ColNames.TIME_TARGET) <= config.time_target)
+                )
+            )
+        )
+    ).extend(new_data).sort(by=ColNames.GROUP).write_ndjson(Files.PASSES)
 
 
 def get_data_check(results: dict[Library, NDArray[np.float64]]) -> pl.DataFrame:
@@ -84,12 +94,60 @@ def get_data_check(results: dict[Library, NDArray[np.float64]]) -> pl.DataFrame:
 
 def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
     quantile_limit: float = limit / 100
-    return df.join(
-        df.group_by(ColNames.LIBRARY).agg(
-            pl.col(ColNames.TIME_MS).quantile(quantile_limit).alias("limit")
-        ),
-        on=ColNames.LIBRARY,
-    ).filter(pl.col(ColNames.TIME_MS) <= pl.col("limit"))
+    return (
+        df.join(
+            df.group_by(ColNames.LIBRARY).agg(
+                pl.col(ColNames.TIME_MS).quantile(quantile_limit).alias("limit")
+            ),
+            on=ColNames.LIBRARY,
+        )
+        .filter(pl.col(ColNames.TIME_MS) <= pl.col("limit"))
+        .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
+    )
+
+
+def save_history(df: pl.DataFrame, config: BenchmarkConfig, file: str) -> None:
+    current_data = pl.read_ndjson(file, schema=Schemas.HISTORY)
+
+    new_data = get_time_results(df, config)
+
+    data_to_add = (
+        new_data.join(
+            current_data,
+            on=[ColNames.GROUP, ColNames.LIBRARY],
+            how="left",
+            suffix="_old",
+        )
+        .filter(
+            pl.col(ColNames.VERSION + "_old").is_null()
+            | (pl.col(ColNames.VERSION) != pl.col(ColNames.VERSION + "_old"))
+            | (
+                (pl.col(ColNames.VERSION) == pl.col(ColNames.VERSION + "_old"))
+                & (
+                    pl.col(ColNames.TIME_TARGET)
+                    >= pl.col(ColNames.TIME_TARGET + "_old")
+                )
+            )
+        )
+        .select(new_data.columns)
+    )
+
+    if data_to_add.is_empty():
+        return
+    to_remove = data_to_add.join(
+        current_data, on=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION]
+    ).filter(pl.col(ColNames.TIME_TARGET) >= pl.col(ColNames.TIME_TARGET + "_right"))
+
+    if not to_remove.is_empty():
+        current_data = current_data.join(
+            to_remove.select([ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION]),
+            on=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION],
+            how="anti",
+        )
+
+    pl.concat([current_data, data_to_add]).sort(
+        by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]
+    ).write_ndjson(file)
 
 
 def get_time_results(df: pl.DataFrame, config: BenchmarkConfig) -> pl.DataFrame:
@@ -103,37 +161,13 @@ def get_time_results(df: pl.DataFrame, config: BenchmarkConfig) -> pl.DataFrame:
         .group_by(
             [ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION, ColNames.TIME_TARGET]
         )
-        .agg(pl.col(ColNames.TIME_MS).median().round(2).alias("median_time"))
+        .agg(pl.col(ColNames.TIME_MS).median().round(2).alias(ColNames.MEDIAN_TIME))
         .drop_nulls()
+        .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
     )
 
 
-def save_time_results(df: pl.DataFrame, config: BenchmarkConfig, file: str) -> None:
-    new_results = get_time_results(df, config)
-    existing_data = (
-        pl.read_ndjson(file, schema=Schemas.HISTORY)
-        .join(
-            new_results.select(
-                [
-                    ColNames.GROUP,
-                    ColNames.LIBRARY,
-                    ColNames.VERSION,
-                    ColNames.TIME_TARGET,
-                ]
-            ),
-            on=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION],
-            how="left",
-            suffix="_new",
-        )
-        .filter(
-            (pl.col("time_target_new").is_null())
-            | (pl.col("time_target_new") < pl.col(ColNames.TIME_TARGET))
-        )
-    ).select(new_results.columns)
-    pl.concat([existing_data, new_results], how="vertical").write_ndjson(file)
-
-
-def get_time_diff(df: pl.DataFrame) -> pl.DataFrame:
+def get_time_relative(df: pl.DataFrame) -> pl.DataFrame:
     return (
         df.group_by([ColNames.GROUP, ColNames.LIBRARY])
         .agg(pl.col(ColNames.TIME_MS).mean().alias("avg_time"), maintain_order=True)
@@ -158,4 +192,4 @@ def get_time_diff(df: pl.DataFrame) -> pl.DataFrame:
             variable_name=ColNames.LIBRARY,
         )
         .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
-    )
+    ).sort(by=[ColNames.GROUP, ColNames.LIBRARY])
