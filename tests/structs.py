@@ -13,6 +13,7 @@ class ColNames(StrEnum):
     LIBRARY = "Library"
     VERSION = auto()
     TIME_TARGET = auto()
+    MEDIAN_TIME = auto()
 
 
 @dataclass(slots=True)
@@ -102,8 +103,8 @@ class Schemas:
         ColNames.GROUP.value: stat_enum,
         ColNames.LIBRARY.value: library_enum,
         ColNames.VERSION.value: pl.Int32,
-        "median_time": pl.Float64,
         ColNames.TIME_TARGET.value: pl.Int32,
+        ColNames.MEDIAN_TIME.value: pl.Float64,
     }
 
     PASSES = {

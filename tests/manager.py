@@ -50,7 +50,7 @@ class BenchmarkManager:
                     )
                     pbar.update(1)
 
-        st.save_total_time(
+        st.save_group_time(
             group_name=group_name, results=results, n_passes=n_passes, config=config
         )
         return st.get_formatted_results(results=results)

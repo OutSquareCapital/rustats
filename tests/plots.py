@@ -44,9 +44,9 @@ def plot_benchmark_results(
 
 def plot_global_bench(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
     combined_results = manager.get_perf_for_all_groups(config=config)
-    bench = st.get_time_diff(combined_results)
-    st.save_time_results(df=combined_results, config=config, file=Files.BENCH_HISTORY)
-    st.save_time_results(df=bench, config=config, file=Files.RELATIVE_HISTORY)
+    bench = st.get_time_relative(combined_results)
+    st.save_history(df=combined_results, config=config, file=Files.BENCH_HISTORY)
+    st.save_history(df=bench, config=config, file=Files.RELATIVE_HISTORY)
     _plot_absolute_results(df=combined_results)
     _plot_relative_results(df=bench)
 
