@@ -1,7 +1,6 @@
 use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray, ndarray as nd };
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use std::cmp::min;
 use crate::calculators as clc;
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
@@ -14,7 +13,8 @@ fn process_with_strategy<F>(
     parallel: bool,
     process_fn: F
 ) -> ArrayOutput
-    where F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
+    where
+        F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
 {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
@@ -54,11 +54,11 @@ pub fn move_indexed<'py>(
         min_length,
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
-            let mut dl = clc::DancingLinks::with_capacity(length);
-            let window_data = input_col.slice(nd::s![0..min(length, num_rows)]);
+            let mut dl = clc::DancingLinks::with_capacity(length + 1);
+            let window_data = input_col.slice(nd::s![0..length]);
             dl.fill(window_data.as_slice().unwrap());
 
-            for row in 0..min(length, num_rows) {
+            for row in 0..length {
                 if dl.len() >= min_length {
                     output_col[row] = dl.median();
                 }
