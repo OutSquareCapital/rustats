@@ -71,14 +71,14 @@ Ensure you select the rigth .venv.
 & C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for testing
 ````
 
-![alt text](docs/environnements.png)
+![alt text](docs/environnements1.png)
 
 - First one is for maturin, you don't care very much about it
 - Always select the second one
 
 Ensure you have 2 powershell terminals, one in rustats, the other in rustats\tests. You can rename them for convenience.
 
-![alt text](docs/terminals.png)
+![alt text](docs/terminals1.png)
 
 When testing, you'll be able to choose wether launching a global test, or a benchmark for a specific group. 
 
@@ -111,20 +111,20 @@ Timing median - rustats_parallel: 100%|█████████████�
 
 ##### Boxplot performance comparison
 
-![alt text](docs/box_bench.png)
+![alt text](docs/box_bench1.png)
 
 ##### Violins performance comparison
 
-![alt text](docs/violin_bench.png)
+![alt text](docs/violin_bench1.png)
 
 #### Visualizing each iteration time
 
-![alt text](docs/iterations_times.png)
+![alt text](docs/iterations_times1.png)
 
 #### With global test
 
-![alt text](docs/global_hist.png)
-![alt text](docs/benchmarks.png)
+![alt text](docs/global_hist1.png)
+![alt text](docs/benchmarks1.png)
 
 ### Saved data
 
