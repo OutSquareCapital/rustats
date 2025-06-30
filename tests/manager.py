@@ -67,10 +67,9 @@ class BenchmarkManager:
         self, config: BenchmarkConfig, time_target: int
     ) -> list[Result]:
         combined_results: list[Result] = []
-        time_by_group = int(time_target / len(self.groups))
         for group_name in self.groups.keys():
             results = self.get_perf_for_group(
-                config=config, group_name=group_name, time_target=time_by_group
+                config=config, group_name=group_name, time_target=time_target
             )
             combined_results.extend(results)
         return combined_results

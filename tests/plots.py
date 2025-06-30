@@ -47,16 +47,17 @@ def plot_benchmark_results(
 def plot_global_bench(
     manager: BenchmarkManager, config: BenchmarkConfig, time_target: int
 ) -> None:
+    time_by_group = int(time_target / len(manager.groups))
     combined_results = manager.get_perf_for_all_groups(
-        config=config, time_target=time_target
+        config=config, time_target=time_by_group
     )
     df = st.get_formatted_results(results=combined_results)
     bench = st.get_time_relative(df)
     st.save_history(
-        df=df, config=config, file=Files.BENCH_HISTORY, time_target=time_target
+        df=df, config=config, file=Files.BENCH_HISTORY, time_target=time_by_group
     )
     st.save_history(
-        df=bench, config=config, file=Files.RELATIVE_HISTORY, time_target=time_target
+        df=bench, config=config, file=Files.RELATIVE_HISTORY, time_target=time_by_group
     )
     _plot_absolute_results(df=df)
     _plot_relative_results(df=bench)
