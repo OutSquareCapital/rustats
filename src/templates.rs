@@ -55,7 +55,7 @@ pub fn move_indexed<'py>(
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
             let mut dl = clc::DancingLinks::with_capacity(length + 1);
-            let window_data = input_col.slice(nd::s![0..length]);
+            let window_data = input_col.slice(nd::s![0..length + 1]);
             dl.fill(window_data.as_slice().unwrap());
 
             for row in 0..length {
