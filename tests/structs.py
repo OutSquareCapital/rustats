@@ -4,9 +4,9 @@ import polars as pl
 
 
 class ColNames(StrEnum):
-    GROUP = "Group"
-    TIME_MS = "Time (ms)"
-    LIBRARY = "Library"
+    GROUP = auto()
+    TIME_MS = "time(ms)"
+    LIBRARY = auto()
     VERSION = auto()
     TIME_TARGET = auto()
     MEDIAN_TIME = auto()
@@ -14,11 +14,13 @@ class ColNames(StrEnum):
 
 
 class Files(StrEnum):
+    NDJSON = auto()
+    PARQUET = auto()
     BASE_DIR = "C:/Users/tibo/python_codes/rustats/tests/data/"
-    PRICES = f"{BASE_DIR}prices.parquet"
-    PASSES = f"{BASE_DIR}passes.ndjson"
-    BENCH_HISTORY = f"{BASE_DIR}bench_history.ndjson"
-    RELATIVE_HISTORY = f"{BASE_DIR}relative_history.ndjson"
+    PRICES = f"{BASE_DIR}prices.{PARQUET}"
+    PASSES = f"{BASE_DIR}passes.{NDJSON}"
+    BENCH_HISTORY = f"{BASE_DIR}bench_history.{NDJSON}"
+    RELATIVE_HISTORY = f"{BASE_DIR}relative_history.{NDJSON}"
 
 
 class Library(StrEnum):

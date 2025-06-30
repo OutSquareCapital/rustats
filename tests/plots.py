@@ -2,16 +2,15 @@ from typing import Literal
 
 import plotly.express as px
 import polars as pl
-
 import stats as st
+from config import BenchmarkConfig
 from manager import BenchmarkManager
 from structs import (
-    Colors,
     ColNames,
+    Colors,
     Files,
     StatType,
 )
-from config import BenchmarkConfig
 
 
 def plot_check(
@@ -95,6 +94,7 @@ def plot_2d_history(file: Files, log_scale: bool, group: StatType) -> None:
         log_y=log_scale,
         template=Colors.TEMPLATE,
     ).show()
+
 
 def _plot_absolute_results(df: pl.DataFrame) -> None:
     px.histogram(  # type: ignore

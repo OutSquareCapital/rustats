@@ -1,15 +1,15 @@
 import numpy as np
 import polars as pl
+from config import BenchmarkConfig
 from numpy.typing import NDArray
 from structs import (
-    Schemas,
     ColNames,
     Files,
     Library,
     Result,
+    Schemas,
     StatType,
 )
-from config import BenchmarkConfig
 
 
 def get_n_passes(time_target: int, group_name: StatType) -> int:
@@ -70,7 +70,7 @@ def save_group_time(
             "time_per_pass_ms": round(sum(r.time for r in results) / n_passes, 3),
         },
         schema=Schemas.PASSES,
-    ).sort(by=ColNames.GROUP)
+    )
 
     pl.scan_ndjson(Files.PASSES, schema=Schemas.PASSES).filter(
         ~(
@@ -83,7 +83,7 @@ def save_group_time(
                 )
             )
         )
-    ).sort(by=ColNames.GROUP).collect().extend(new_data.collect()).write_ndjson(
+    ).collect().extend(new_data.collect()).sort(by=ColNames.GROUP).write_ndjson(
         file=Files.PASSES
     )
 
@@ -119,65 +119,25 @@ def get_data_distribution(df: pl.DataFrame, limit: float) -> pl.DataFrame:
 def save_history(
     df: pl.DataFrame, config: BenchmarkConfig, file: str, time_target: int
 ) -> None:
-    current_data = pl.read_ndjson(source=file, schema=Schemas.HISTORY)
+    current_data = pl.scan_ndjson(source=file, schema=Schemas.HISTORY)
 
-    new_data = _get_new_history(df=df, config=config, time_target=time_target)
+    new_data = _get_new_history(df=df.lazy(), config=config, time_target=time_target)
 
-    data_to_add = (
-        new_data.join(
-            current_data,
-            on=[ColNames.GROUP, ColNames.LIBRARY],
-            how="left",
-            suffix="_old",
-        )
-        .filter(
-            pl.col(ColNames.VERSION + "_old").is_null()
-            | (pl.col(ColNames.VERSION) != pl.col(ColNames.VERSION + "_old"))
-            | (
-                (pl.col(ColNames.VERSION) == pl.col(ColNames.VERSION + "_old"))
-                & (
-                    pl.col(ColNames.TIME_TARGET)
-                    >= pl.col(ColNames.TIME_TARGET + "_old")
-                )
-            )
-        )
-        .select(new_data.columns)
-    )
-    if data_to_add.is_empty():
-        return
-    else:
-        to_remove = data_to_add.join(
-            current_data, on=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION]
-        ).filter(
-            pl.col(ColNames.TIME_TARGET) >= pl.col(ColNames.TIME_TARGET + "_right")
-        )
-
-        if not to_remove.is_empty():
-            current_data = current_data.join(
-                to_remove.select([ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION]),
-                on=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION],
-                how="anti",
-            )
-
-        pl.concat([current_data, data_to_add]).unique(
-            subset=[
-                ColNames.GROUP,
-                ColNames.LIBRARY,
-                ColNames.VERSION,
-                ColNames.TIME_TARGET,
-                ColNames.MEDIAN_TIME,
-            ]
-        ).sort(by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]).write_ndjson(
-            file=file
-        )
+    pl.concat([current_data, new_data]).sort(
+        by=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION, ColNames.TIME_TARGET],
+        descending=[False, False, False, True],
+    ).unique(
+        subset=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION], keep="first"
+    ).sort(
+        by=[ColNames.VERSION, ColNames.GROUP, ColNames.LIBRARY]
+    ).collect().write_ndjson(file)
 
 
 def _get_new_history(
-    df: pl.DataFrame, config: BenchmarkConfig, time_target: int
-) -> pl.DataFrame:
+    df: pl.LazyFrame, config: BenchmarkConfig, time_target: int
+) -> pl.LazyFrame:
     return (
-        df.lazy()
-        .with_columns(
+        df.with_columns(
             pl.lit(value=config.version, dtype=pl.Int32).alias(ColNames.VERSION),
             pl.lit(value=time_target, dtype=pl.Int32).alias(ColNames.TIME_TARGET),
         )
@@ -187,14 +147,16 @@ def _get_new_history(
         .agg(pl.col(ColNames.TIME_MS).median().round(2).alias(ColNames.MEDIAN_TIME))
         .drop_nulls()
         .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
-    ).collect()
+    )
 
 
 def get_time_relative(df: pl.DataFrame) -> pl.DataFrame:
     return (
         (
-            df.group_by([ColNames.GROUP, ColNames.LIBRARY])
+            df.lazy()
+            .group_by([ColNames.GROUP, ColNames.LIBRARY])
             .agg(pl.col(ColNames.TIME_MS).mean().alias("avg_time"), maintain_order=True)
+            .collect()
             .pivot(values="avg_time", index=ColNames.GROUP, on=ColNames.LIBRARY)
             .lazy()
             .with_columns(
