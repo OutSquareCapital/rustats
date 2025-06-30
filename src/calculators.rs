@@ -318,12 +318,12 @@ impl DequeStatCalculator for Max {
     }
 }
 
-pub struct Rank {
+pub struct ValidCounter {
     greater_count: usize,
     equal_count: usize,
     pub valid_count: usize,
 }
-impl Rank {
+impl ValidCounter {
     pub fn new() -> Self {
         Self {
             greater_count: 0,

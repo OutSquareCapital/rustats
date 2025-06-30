@@ -2,136 +2,146 @@ use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray };
 use pyo3::prelude::*;
 use numpy::ndarray::{ Array2, ArrayView1, ArrayViewMut1 };
 use rayon::prelude::*;
-use crate::calculators;
+use crate::calculators as clc;
 use std::collections::VecDeque;
 
-#[pyfunction]
-pub fn move_median<'py>(
+pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
+
+pub fn move_indexed_template<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
     min_length: usize,
     parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
+) -> ArrayOutput {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
     let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    if parallel {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                process_median_column(&input_col, output_col, length, min_length, num_rows);
-            });
-    } else {
-        py.allow_threads(move || {
+    py.allow_threads(move || {
+        if parallel {
+            input_columns
+                .into_par_iter()
+                .zip(output_columns.par_iter_mut())
+                .for_each(|(input_col, output_col)| {
+                    process_indexed_column(&input_col, output_col, length, min_length, num_rows);
+                });
+        } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_median_column(&input_col, output_col, length, min_length, num_rows);
+                process_indexed_column(&input_col, output_col, length, min_length, num_rows);
             }
-        });
-    }
-
-    Ok(PyArray2::from_owned_array(py, output).into())
+        }
+    });
+    Ok(output.into_pyarray(py).into())
 }
 
-#[pyfunction]
-pub fn move_rank<'py>(
+pub fn move_valid_count_template<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
     min_length: usize,
     parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
+) -> ArrayOutput {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
     let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    if parallel {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                process_rank_column(&input_col, output_col, length, min_length, num_rows);
-            });
-    } else {
-        py.allow_threads(move || {
+    py.allow_threads(move || {
+        if parallel {
+            input_columns
+                .into_par_iter()
+                .zip(output_columns.par_iter_mut())
+                .for_each(|(input_col, output_col)| {
+                    process_valid_count_column(
+                        &input_col,
+                        output_col,
+                        length,
+                        min_length,
+                        num_rows
+                    );
+                });
+        } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_rank_column(&input_col, output_col, length, min_length, num_rows);
+                process_valid_count_column(&input_col, output_col, length, min_length, num_rows);
             }
-        });
-    }
-
-    Ok(PyArray2::from_owned_array(py, output).into())
+        }
+    });
+    Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_template<Stat: calculators::StatCalculator>(
+pub fn move_accumulator_template<Stat: clc::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
     min_length: usize,
     parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
+) -> ArrayOutput {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    if parallel {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                process_stat_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
-            });
-    } else {
-        py.allow_threads(move || {
+    py.allow_threads(move || {
+        if parallel {
+            input_columns
+                .into_par_iter()
+                .zip(output_columns.par_iter_mut())
+                .for_each(|(input_col, output_col)| {
+                    process_stat_column::<Stat>(
+                        &input_col,
+                        output_col,
+                        length,
+                        min_length,
+                        num_rows
+                    );
+                });
+        } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
                 process_stat_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
             }
-        });
-    }
-
+        }
+    });
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_deque_template<Stat: calculators::DequeStatCalculator>(
+pub fn move_deque_template<Stat: clc::DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
     min_length: usize,
     parallel: bool
-) -> PyResult<Py<PyArray2<f64>>> {
+) -> ArrayOutput {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    if parallel {
-        input_columns
-            .into_par_iter()
-            .zip(output_columns.par_iter_mut())
-            .for_each(|(input_col, output_col)| {
-                process_deque_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
-            });
-    } else {
-        py.allow_threads(move || {
+    py.allow_threads(move || {
+        if parallel {
+            input_columns
+                .into_par_iter()
+                .zip(output_columns.par_iter_mut())
+                .for_each(|(input_col, output_col)| {
+                    process_deque_column::<Stat>(
+                        &input_col,
+                        output_col,
+                        length,
+                        min_length,
+                        num_rows
+                    );
+                });
+        } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
                 process_deque_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
             }
-        });
-    }
-
+        }
+    });
     Ok(output.into_pyarray(py).into())
 }
 
-fn process_stat_column<Stat: calculators::StatCalculator>(
+fn process_stat_column<Stat: clc::StatCalculator>(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -139,7 +149,7 @@ fn process_stat_column<Stat: calculators::StatCalculator>(
     num_rows: usize
 ) {
     let mut state = Stat::new();
-    let mut window = calculators::WindowState::new();
+    let mut window = clc::WindowState::new();
 
     for row in 0..length {
         window.current = input_col[row];
@@ -162,7 +172,7 @@ fn process_stat_column<Stat: calculators::StatCalculator>(
     }
 }
 
-fn process_deque_column<Stat: calculators::DequeStatCalculator>(
+fn process_deque_column<Stat: clc::DequeStatCalculator>(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -170,7 +180,7 @@ fn process_deque_column<Stat: calculators::DequeStatCalculator>(
     num_rows: usize
 ) {
     let mut deque = Stat::new();
-    let mut window = calculators::WindowState::new();
+    let mut window = clc::WindowState::new();
 
     for row in 0..length {
         window.current = input_col[row];
@@ -196,7 +206,7 @@ fn process_deque_column<Stat: calculators::DequeStatCalculator>(
     }
 }
 
-pub fn process_rank_column(
+pub fn process_valid_count_column(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -209,7 +219,7 @@ pub fn process_rank_column(
             continue;
         }
 
-        let mut rank_count = calculators::Rank::new();
+        let mut rank_count = clc::ValidCounter::new();
         for j in 0..row {
             let other: f64 = input_col[j];
             rank_count.add(other, current);
@@ -226,7 +236,7 @@ pub fn process_rank_column(
             continue;
         }
 
-        let mut rank_count = calculators::Rank::new();
+        let mut rank_count = clc::ValidCounter::new();
         let start_idx: usize = row - length + 1;
         for j in start_idx..row {
             let other: f64 = input_col[j];
@@ -239,17 +249,17 @@ pub fn process_rank_column(
     }
 }
 
-fn process_median_column(
+fn process_indexed_column(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
     min_length: usize,
     num_rows: usize
 ) {
-    let mut small_heap = calculators::Indexed::new(length, num_rows, true);
-    let mut large_heap = calculators::Indexed::new(length, num_rows, false);
+    let mut small_heap = clc::Indexed::new(length, num_rows, true);
+    let mut large_heap = clc::Indexed::new(length, num_rows, false);
     let mut window_q = VecDeque::with_capacity(length + 1);
-    let mut window = calculators::WindowState::new();
+    let mut window = clc::WindowState::new();
 
     for row in 0..length {
         window.current = input_col[row];
