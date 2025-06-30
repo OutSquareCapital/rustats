@@ -69,7 +69,7 @@ def plot_global_bench(
         absolute, config=config, time_target=time_by_group
     )
     px.histogram(  # type: ignore
-        absolute,
+        absolute.collect(),
         x=ColNames.GROUP,
         y=ColNames.TIME_MS,
         color=ColNames.LIBRARY,
@@ -82,7 +82,7 @@ def plot_global_bench(
     ).show()
 
     px.bar(  # type: ignore
-        relative,
+        relative.collect(),
         x=ColNames.GROUP,
         y=ColNames.TIME_MS,
         color=ColNames.LIBRARY,
@@ -90,7 +90,7 @@ def plot_global_bench(
         title="Benchmark Comparisons (Difference in ms). Higher is better.",
         template=Colors.TEMPLATE,
         color_discrete_map=Colors.RELATIVE,
-    ).show()
+    ).add_hline(y=1, line_color="white", line_width=3).show()
 
 
 def plot_3d_history(file: Files, log_scale: bool) -> None:

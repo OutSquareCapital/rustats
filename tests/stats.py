@@ -70,35 +70,32 @@ def get_relative_results(
     df: pl.LazyFrame, config: BenchmarkConfig, time_target: int
 ) -> pl.LazyFrame:
     relative = (
-        (
-            df.group_by([ColNames.GROUP, ColNames.LIBRARY])
-            .agg(pl.col(ColNames.TIME_MS).mean().alias("avg_time"), maintain_order=True)
-            .collect()
-            .pivot(values="avg_time", index=ColNames.GROUP, on=ColNames.LIBRARY)
-            .lazy()
-            .with_columns(
-                [
-                    (pl.col(name=Library.BOTTLENECK).sub(other=Library.RUSTATS)).alias(
-                        name=Library.BN_BENCH
-                    ),
-                    (
-                        pl.col(name=Library.NUMBAGG).sub(other=Library.RUSTATS_PARALLEL)
-                    ).alias(name=Library.NBG_BENCH),
-                    (
-                        pl.col(name=Library.POLARS).sub(other=Library.RUSTATS_PARALLEL)
-                    ).alias(name=Library.PL_BENCH),
-                ]
-            )
-            .unpivot(
-                on=[Library.BN_BENCH, Library.NBG_BENCH, Library.PL_BENCH],
-                index=ColNames.GROUP,
-                value_name=ColNames.TIME_MS,
-                variable_name=ColNames.LIBRARY,
-            )
-            .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
+        df.group_by([ColNames.GROUP, ColNames.LIBRARY])
+        .agg(pl.col(ColNames.TIME_MS).mean().alias("avg_time"), maintain_order=True)
+        .collect()
+        .pivot(values="avg_time", index=ColNames.GROUP, on=ColNames.LIBRARY)
+        .lazy()
+        .with_columns(
+            [
+                (pl.col(name=Library.BOTTLENECK).truediv(other=Library.RUSTATS)).alias(
+                    name=Library.BN_BENCH
+                ),
+                (
+                    pl.col(name=Library.NUMBAGG).truediv(other=Library.RUSTATS_PARALLEL)
+                ).alias(name=Library.NBG_BENCH),
+                (
+                    pl.col(name=Library.POLARS).truediv(other=Library.RUSTATS_PARALLEL)
+                ).alias(name=Library.PL_BENCH),
+            ]
         )
-        .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
-    )
+        .unpivot(
+            on=[Library.BN_BENCH, Library.NBG_BENCH, Library.PL_BENCH],
+            index=ColNames.GROUP,
+            value_name=ColNames.TIME_MS,
+            variable_name=ColNames.LIBRARY,
+        )
+        .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
+    ).sort(by=[ColNames.GROUP, ColNames.LIBRARY])
     _save_history(
         df=relative,
         config=config,

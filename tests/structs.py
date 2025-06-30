@@ -29,9 +29,9 @@ class Library(StrEnum):
     RUSTATS = auto()
     RUSTATS_PARALLEL = auto()
     NUMBAGG = auto()
-    BN_BENCH = f"{BOTTLENECK} - {RUSTATS}"
-    NBG_BENCH = f"{NUMBAGG} - {RUSTATS_PARALLEL}"
-    PL_BENCH = f"{POLARS} - {RUSTATS_PARALLEL}"
+    BN_BENCH = f"{BOTTLENECK}/{RUSTATS}"
+    NBG_BENCH = f"{NUMBAGG}/{RUSTATS_PARALLEL}"
+    PL_BENCH = f"{POLARS}/{RUSTATS_PARALLEL}"
 
 
 class StatType(StrEnum):
