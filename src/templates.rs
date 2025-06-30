@@ -54,30 +54,51 @@ pub fn move_indexed<'py>(
         min_length,
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
-            let mut dl = clc::DancingLinks::with_capacity(length + 1);
-            let window_data = input_col.slice(nd::s![0..length]);
-            dl.fill(window_data.as_slice().unwrap());
+            let mut processor = clc::IndexedProcessor::new(length, num_rows);
+            let mut window = clc::WindowState::new();
 
             for row in 0..length {
-                if dl.len() >= min_length {
-                    output_col[row] = dl.median();
+                window.current = input_col[row];
+
+                processor.deque.push_back((window.current, row));
+
+                if !window.current.is_nan() {
+                    window.observations += 1;
+                    processor.push_values(window.current, row);
+                }
+
+                processor.equilibrate();
+
+                if window.observations >= min_length {
+                    if processor.check() {
+                        if let Some((val, _)) = processor.small_heap.peek() {
+                            output_col[row] = val;
+                        }
+                    } else if !processor.small_heap.heap.is_empty() {
+                        output_col[row] = processor.get();
+                    }
                 }
             }
 
             for row in length..num_rows {
-                let oldest_idx = row - length;
-                let oldest_val = input_col[oldest_idx];
-                let newest_val = input_col[row];
-                if !oldest_val.is_nan() {
-                    dl.remove_by_original_index(oldest_idx);
-                }
+                window.current = input_col[row];
+                processor.deque.push_back((window.current, row));
 
-                if !newest_val.is_nan() {
-                    dl.add_with_index(newest_val, row);
+                if !window.current.is_nan() {
+                    window.observations += 1;
+                    processor.push_values(window.current, row);
                 }
+                processor.remove(&mut window, length);
+                processor.equilibrate();
 
-                if dl.len() >= min_length {
-                    output_col[row] = dl.median();
+                if window.observations >= min_length {
+                    if processor.check() {
+                        if let Some((val, _)) = processor.small_heap.peek() {
+                            output_col[row] = val;
+                        }
+                    } else if !processor.small_heap.heap.is_empty() {
+                        output_col[row] = processor.get();
+                    }
                 }
             }
         }
