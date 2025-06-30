@@ -7,6 +7,40 @@ use std::collections::VecDeque;
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
 
+fn process_with_strategy<F>(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f64>,
+    length: usize,
+    min_length: usize,
+    parallel: bool,
+    process_fn: F
+) -> ArrayOutput
+    where F: Fn(&ArrayView1<f64>, &mut ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
+{
+    let array = array.as_array();
+    let (num_rows, num_cols) = array.dim();
+    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
+    let input_columns: Vec<_> = array.columns().into_iter().collect();
+    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
+
+    py.allow_threads(move || {
+        if parallel {
+            input_columns
+                .into_par_iter()
+                .zip(output_columns.par_iter_mut())
+                .for_each(|(input_col, output_col)| {
+                    process_fn(&input_col, output_col, length, min_length, num_rows);
+                });
+        } else {
+            for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
+                process_fn(&input_col, output_col, length, min_length, num_rows);
+            }
+        }
+    });
+
+    Ok(output.into_pyarray(py).into())
+}
+
 pub fn move_indexed<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
@@ -72,32 +106,39 @@ pub fn move_accumulator<Stat: clc::StatCalculator>(
     min_length: usize,
     parallel: bool
 ) -> ArrayOutput {
-    let array = array.as_array();
-    let (num_rows, num_cols) = array.dim();
-    let input_columns: Vec<_> = array.columns().into_iter().collect();
-    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-    py.allow_threads(move || {
-        if parallel {
-            input_columns
-                .into_par_iter()
-                .zip(output_columns.par_iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_accumulator::<Stat>(
-                        &input_col,
-                        output_col,
-                        length,
-                        min_length,
-                        num_rows
-                    );
-                });
-        } else {
-            for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_accumulator::<Stat>(&input_col, output_col, length, min_length, num_rows);
+    process_with_strategy(
+        py,
+        array,
+        length,
+        min_length,
+        parallel,
+        |input_col, output_col, length, min_length, num_rows| {
+            {
+                let mut state = Stat::new();
+                let mut window = clc::WindowState::new();
+
+                for row in 0..length {
+                    window.current = input_col[row];
+                    if !window.current.is_nan() {
+                        window.observations += 1;
+                        Stat::add_value(&mut state, window.current);
+                    }
+
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
+                }
+
+                for row in length..num_rows {
+                    window.refresh(&input_col, row, length);
+                    window.compute_row::<Stat>(&mut state);
+                    if window.observations >= min_length {
+                        output_col[row] = Stat::get(&state, window.observations);
+                    }
+                }
             }
         }
-    });
-    Ok(output.into_pyarray(py).into())
+    )
 }
 
 pub fn move_deque<Stat: clc::DequeStatCalculator>(
@@ -127,37 +168,6 @@ pub fn move_deque<Stat: clc::DequeStatCalculator>(
         }
     });
     Ok(output.into_pyarray(py).into())
-}
-
-fn process_accumulator<Stat: clc::StatCalculator>(
-    input_col: &ArrayView1<f64>,
-    output_col: &mut ArrayViewMut1<f64>,
-    length: usize,
-    min_length: usize,
-    num_rows: usize
-) {
-    let mut state = Stat::new();
-    let mut window = clc::WindowState::new();
-
-    for row in 0..length {
-        window.current = input_col[row];
-        if !window.current.is_nan() {
-            window.observations += 1;
-            Stat::add_value(&mut state, window.current);
-        }
-
-        if window.observations >= min_length {
-            output_col[row] = Stat::get(&state, window.observations);
-        }
-    }
-
-    for row in length..num_rows {
-        window.refresh(&input_col, row, length);
-        window.compute_row::<Stat>(&mut state);
-        if window.observations >= min_length {
-            output_col[row] = Stat::get(&state, window.observations);
-        }
-    }
 }
 
 fn process_deque<Stat: clc::DequeStatCalculator>(
