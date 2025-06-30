@@ -1,9 +1,8 @@
-use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray };
+use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray, ndarray as nd };
 use pyo3::prelude::*;
-use numpy::ndarray::{ Array2, ArrayView1, ArrayViewMut1 };
 use rayon::prelude::*;
+use std::cmp::min;
 use crate::calculators as clc;
-use std::collections::VecDeque;
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
 
@@ -15,11 +14,11 @@ fn process_with_strategy<F>(
     parallel: bool,
     process_fn: F
 ) -> ArrayOutput
-    where F: Fn(&ArrayView1<f64>, &mut ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
+    where F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
 {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
-    let mut output = Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
+    let mut output = nd::Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
     let input_columns: Vec<_> = array.columns().into_iter().collect();
     let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
 
@@ -55,108 +54,30 @@ pub fn move_indexed<'py>(
         min_length,
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
-            let mut small_heap = clc::Indexed::new(length, num_rows, true);
-            let mut large_heap = clc::Indexed::new(length, num_rows, false);
-            let mut window_q = VecDeque::with_capacity(length + 1);
-            let mut window = clc::WindowState::new();
+            let mut dl = clc::DancingLinks::with_capacity(length);
+            let window_data = input_col.slice(nd::s![0..min(length, num_rows)]);
+            dl.fill(window_data.as_slice().unwrap());
 
-            for row in 0..length {
-                window.current = input_col[row];
-
-                window_q.push_back((window.current, row));
-
-                if !window.current.is_nan() {
-                    window.observations += 1;
-
-                    if let Some((max_small, _)) = small_heap.peek() {
-                        if window.current > max_small {
-                            large_heap.push(window.current, row);
-                        } else {
-                            small_heap.push(window.current, row);
-                        }
-                    } else {
-                        small_heap.push(window.current, row);
-                    }
-                }
-
-                while small_heap.heap.len() > large_heap.heap.len() + 1 {
-                    if let Some((val, idx)) = small_heap.pop() {
-                        large_heap.push(val, idx);
-                    }
-                }
-
-                while large_heap.heap.len() > small_heap.heap.len() {
-                    if let Some((val, idx)) = large_heap.pop() {
-                        small_heap.push(val, idx);
-                    }
-                }
-
-                if window.observations >= min_length {
-                    if small_heap.heap.len() > large_heap.heap.len() {
-                        if let Some((val, _)) = small_heap.peek() {
-                            output_col[row] = val;
-                        }
-                    } else if !small_heap.heap.is_empty() {
-                        let s_val: f64 = small_heap.peek().unwrap().0;
-                        let l_val: f64 = large_heap.peek().unwrap().0;
-                        output_col[row] = (s_val + l_val) / 2.0;
-                    }
+            for row in 0..min(length, num_rows) {
+                if dl.len() >= min_length {
+                    output_col[row] = dl.median();
                 }
             }
 
             for row in length..num_rows {
-                window.current = input_col[row];
-                window_q.push_back((window.current, row));
-
-                if !window.current.is_nan() {
-                    window.observations += 1;
-
-                    if let Some((max_small, _)) = small_heap.peek() {
-                        if window.current > max_small {
-                            large_heap.push(window.current, row);
-                        } else {
-                            small_heap.push(window.current, row);
-                        }
-                    } else {
-                        small_heap.push(window.current, row);
-                    }
+                let oldest_idx = row - length;
+                let oldest_val = input_col[oldest_idx];
+                let newest_val = input_col[row];
+                if !oldest_val.is_nan() {
+                    dl.remove_by_original_index(oldest_idx);
                 }
 
-                if window_q.len() > length {
-                    (window.precedent, window.precedent_idx) = window_q.pop_front().unwrap();
-
-                    if !window.precedent.is_nan() {
-                        window.observations -= 1;
-
-                        if small_heap.remove(window.precedent_idx) {
-                        } else {
-                            large_heap.remove(window.precedent_idx);
-                        }
-                    }
+                if !newest_val.is_nan() {
+                    dl.add_with_index(newest_val, row);
                 }
 
-                while small_heap.heap.len() > large_heap.heap.len() + 1 {
-                    if let Some((val, idx)) = small_heap.pop() {
-                        large_heap.push(val, idx);
-                    }
-                }
-
-                while large_heap.heap.len() > small_heap.heap.len() {
-                    if let Some((val, idx)) = large_heap.pop() {
-                        small_heap.push(val, idx);
-                    }
-                }
-
-                if window.observations >= min_length {
-                    if small_heap.heap.len() > large_heap.heap.len() {
-                        if let Some((val, _)) = small_heap.peek() {
-                            output_col[row] = val;
-                        }
-                    } else if !small_heap.heap.is_empty() {
-                        let s_val: f64 = small_heap.peek().unwrap().0;
-                        let l_val: f64 = large_heap.peek().unwrap().0;
-                        output_col[row] = (s_val + l_val) / 2.0;
-                    }
+                if dl.len() >= min_length {
+                    output_col[row] = dl.median();
                 }
             }
         }

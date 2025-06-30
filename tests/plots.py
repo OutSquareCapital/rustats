@@ -44,23 +44,13 @@ def plot_group_bench(
     absolute = st.get_absolute_results(
         results=results, config=config, time_target=time_target
     )
-    relative = st.get_relative_results(absolute, config=config, time_target=time_target)
     abs_distribution = st.get_data_distribution(df=absolute, limit=config.limit)
-    relative_distribution = st.get_data_distribution(
-        df=relative, limit=config.limit
-    )
     line_data = st.get_line_check(df=absolute, iterations=len(results))
     _plot_group_bench(
         df=abs_distribution, group_name=group_name, kind="box", log_scale=True
     )
     _plot_group_bench(
         df=abs_distribution, group_name=group_name, kind="violins", log_scale=True
-    )
-    _plot_group_bench(
-        df=relative_distribution, group_name=group_name, kind="box", log_scale=False
-    )
-    _plot_group_bench(
-        df=relative_distribution, group_name=group_name, kind="violins", log_scale=False
     )
     _plot_iterations(df=line_data.collect(), group_name=group_name)
 

@@ -1,6 +1,6 @@
 use crate::stats;
 use std::collections::VecDeque;
-use numpy::ndarray::{ ArrayBase, ViewRepr, Dim };
+use numpy::ndarray as nd;
 pub struct Squared {
     sum_simple: f64,
     sum_square: f64,
@@ -77,7 +77,7 @@ impl WindowState {
     #[inline(always)]
     pub fn refresh(
         &mut self,
-        input_col: &ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>,
+        input_col: &nd::ArrayBase<nd::ViewRepr<&f64>, nd::Dim<[usize; 1]>>,
         row: usize,
         length: usize
     ) {
@@ -349,125 +349,223 @@ impl ValidCounter {
     }
 }
 
-pub struct Indexed {
-    pub heap: Vec<(f64, usize)>,
-    positions: Vec<Option<usize>>,
-    is_max_heap: bool,
+pub struct DancingLinks {
+    values: Vec<f64>,
+    pi: Vec<u32>,
+    prev: Vec<u32>,
+    next: Vec<u32>,
+    current_position: usize,
+    current_index: usize,
+    n_element: usize,
+    tail: usize,
+    index_map: Vec<usize>,
 }
 
-impl Indexed {
-    pub fn new(capacity: usize, max_idx: usize, is_max_heap: bool) -> Self {
+impl DancingLinks {
+    #[inline(always)]
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            heap: Vec::with_capacity(capacity),
-            positions: vec![None; max_idx],
-            is_max_heap,
+            values: Vec::with_capacity(capacity),
+            pi: Vec::with_capacity(capacity),
+            prev: vec![0; capacity + 1],
+            next: vec![0; capacity + 1],
+            current_position: 0,
+            current_index: 0,
+            n_element: 0,
+            tail: capacity,
+            index_map: Vec::with_capacity(capacity),
         }
     }
 
     #[inline(always)]
-    pub fn compare(&self, a: f64, b: f64) -> bool {
-        let result: bool = a > b;
-        result == self.is_max_heap
-    }
-    #[inline(always)]
-    pub fn peek(&self) -> Option<(f64, usize)> {
-        self.heap.first().copied()
-    }
+    pub fn init_links(&mut self) {
+        let mut p = self.tail;
 
-    pub fn push(&mut self, value: f64, idx: usize) {
-        let pos: usize = self.heap.len();
-        self.heap.push((value, idx));
-        self.positions[idx] = Some(pos);
-        self.sift_up(pos);
-    }
-    #[inline(always)]
-    pub fn pop(&mut self) -> Option<(f64, usize)> {
-        if self.heap.is_empty() {
-            return None;
+        for &q in self.pi.iter() {
+            self.next[p] = q;
+            self.prev[q as usize] = p as u32;
+            p = q as usize;
         }
 
-        let result: (f64, usize) = self.heap[0];
-        self.positions[result.1] = None;
+        self.next[p] = self.tail as u32;
+        self.prev[self.tail] = p as u32;
+    }
 
-        let last: (f64, usize) = self.heap.pop().unwrap();
-        if !self.heap.is_empty() {
-            self.heap[0] = last;
-            self.positions[last.1] = Some(0);
-            self.sift_down(0);
-        }
-
-        Some(result)
+    #[inline(always)]
+    pub fn delete_link(&mut self, i: usize) {
+        self.next[self.prev[i] as usize] = self.next[i];
+        self.prev[self.next[i] as usize] = self.prev[i];
+        self.n_element -= 1;
     }
     #[inline(always)]
-    pub fn remove(&mut self, idx: usize) -> bool {
-        if let Some(pos) = self.positions[idx] {
-            self.positions[idx] = None;
-
-            if pos == self.heap.len() - 1 {
-                self.heap.pop();
-            } else {
-                let last: (f64, usize) = self.heap.pop().unwrap();
-                self.heap[pos] = last;
-                self.positions[last.1] = Some(pos);
-
-                let parent: usize = pos.saturating_sub(1) / 2;
-                if pos > 0 && self.compare(self.heap[pos].0, self.heap[parent].0) {
-                    self.sift_up(pos);
-                } else {
-                    self.sift_down(pos);
+    pub fn traverse_to_index(&mut self, i: usize) {
+        match (i as i64) - (self.current_index as i64) {
+            0 => {}
+            -1 => {
+                self.current_index -= 1;
+                self.current_position = self.prev[self.current_position] as usize;
+            }
+            1 => self.advance(),
+            i64::MIN..=0 => {
+                for _ in i..self.current_index {
+                    self.current_position = self.prev[self.current_position] as usize;
                 }
+                self.current_index = i;
             }
-            true
+            _ => {
+                for _ in self.current_index..i {
+                    self.current_position = self.next[self.current_position] as usize;
+                }
+                self.current_index = i;
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn advance(&mut self) {
+        if self.current_index < self.n_element {
+            self.current_index += 1;
+            self.current_position = self.next[self.current_position] as usize;
+        }
+    }
+
+    #[inline(always)]
+    pub fn at_end(&self) -> bool {
+        self.current_position == self.tail
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.n_element == 0
+    }
+
+    #[inline(always)]
+    pub fn peek(&self) -> Option<f64> {
+        if self.at_end() { None } else { Some(self.values[self.current_position]) }
+    }
+    pub fn fill(&mut self, values: &[f64]) {
+        self.clear();
+
+        for (i, &v) in values.iter().enumerate() {
+            if !v.is_nan() {
+                self.values.push(v);
+                self.index_map.push(i);
+            }
+        }
+
+        let n = self.values.len();
+        self.pi = (0..n as u32).collect();
+        self.pi.sort_by(|&a, &b| {
+            self.values[a as usize].partial_cmp(&self.values[b as usize]).unwrap()
+        });
+
+        self.prev.resize(n + 1, 0);
+        self.next.resize(n + 1, 0);
+        self.n_element = n;
+        self.tail = n;
+
+        self.init_links();
+
+        if !self.is_empty() {
+            self.current_index = 0;
+            self.current_position = self.next[self.tail] as usize;
+            let mid = self.n_element / 2;
+            self.traverse_to_index(mid);
+        }
+    }
+
+    pub fn remove_by_original_index(&mut self, original_idx: usize) -> bool {
+        let pos = self.index_map.iter().position(|&idx| idx == original_idx);
+
+        if let Some(pos) = pos {
+            self.delete_link(pos);
+            if self.current_index > 0 && pos < self.current_index {
+                self.current_index -= 1;
+            }
+            return true;
+        }
+
+        false
+    }
+
+    pub fn add_with_index(&mut self, value: f64, original_idx: usize) {
+        let pos = self.values.len();
+        self.values.push(value);
+        self.index_map.push(original_idx);
+
+        let insert_pos = match
+            self.pi.binary_search_by(|&i| { self.values[i as usize].partial_cmp(&value).unwrap() })
+        {
+            Ok(pos) => pos,
+            Err(pos) => pos,
+        };
+
+        self.pi.insert(insert_pos, pos as u32);
+
+        if self.n_element == 0 {
+            self.next[self.tail] = pos as u32;
+            self.prev[pos] = self.tail as u32;
+            self.next[pos] = self.tail as u32;
+            self.prev[self.tail] = pos as u32;
+            self.current_position = pos;
+            self.current_index = 0;
         } else {
-            false
-        }
-    }
-    #[inline(always)]
-    fn sift_up(&mut self, mut pos: usize) {
-        while pos > 0 {
-            let parent: usize = (pos - 1) / 2;
-            if !self.compare(self.heap[pos].0, self.heap[parent].0) {
-                break;
-            }
+            if insert_pos > 0 {
+                let prev_idx = self.pi[insert_pos - 1] as usize;
+                let next_idx = self.next[prev_idx];
 
-            self.heap.swap(pos, parent);
-            self.positions[self.heap[pos].1] = Some(pos);
-            self.positions[self.heap[parent].1] = Some(parent);
-
-            pos = parent;
-        }
-    }
-    #[inline(always)]
-    fn sift_down(&mut self, mut pos: usize) {
-        let len: usize = self.heap.len();
-        let node_value: f64 = self.heap[pos].0;
-        let node_idx: usize = self.heap[pos].1;
-
-        loop {
-            let left: usize = 2 * pos + 1;
-            if left >= len {
-                break;
-            }
-
-            let right: usize = left + 1;
-            let target: usize = if
-                right < len &&
-                self.compare(self.heap[right].0, self.heap[left].0)
-            {
-                right
+                self.next[prev_idx] = pos as u32;
+                self.prev[pos] = prev_idx as u32;
+                self.next[pos] = next_idx;
+                self.prev[next_idx as usize] = pos as u32;
             } else {
-                left
-            };
+                let next_idx = self.next[self.tail];
 
-            if !self.compare(self.heap[target].0, node_value) {
-                break;
+                self.next[self.tail] = pos as u32;
+                self.prev[pos] = self.tail as u32;
+                self.next[pos] = next_idx;
+                self.prev[next_idx as usize] = pos as u32;
             }
-            self.heap[pos] = self.heap[target];
-            self.positions[self.heap[pos].1] = Some(pos);
 
-            pos = target;
+            let new_mid = self.n_element / 2;
+            if new_mid != self.current_index {
+                self.traverse_to_index(new_mid);
+            }
         }
-        self.heap[pos] = (node_value, node_idx);
-        self.positions[node_idx] = Some(pos);
+
+        self.n_element += 1;
+    }
+
+    pub fn clear(&mut self) {
+        self.values.clear();
+        self.pi.clear();
+        self.prev.resize(1, 0);
+        self.next.resize(1, 0);
+        self.current_position = 0;
+        self.current_index = 0;
+        self.n_element = 0;
+        self.index_map.clear();
+    }
+
+    pub fn median(&mut self) -> f64 {
+        if self.is_empty() {
+            return f64::NAN;
+        }
+
+        let mid = self.n_element / 2;
+        self.traverse_to_index(mid);
+
+        if self.n_element % 2 == 0 && self.n_element > 1 {
+            let v1 = self.peek().unwrap();
+            self.traverse_to_index(mid - 1);
+            let v2 = self.peek().unwrap();
+            (v1 + v2) / 2.0
+        } else {
+            self.peek().unwrap()
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.n_element
     }
 }
