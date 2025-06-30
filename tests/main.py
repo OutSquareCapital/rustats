@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     pio.renderers.default = "browser"  # type: ignore
     rolling = BenchmarkManager(groups=ROLLING_FUNCS)
-    array = st.get_array(pl.read_parquet(source=Files.PRICES))
+    array = st.get_array(Files.PRICES)
     config = BenchmarkConfig(array=array, df=pl.from_numpy(array))
 
     main(manager=rolling, config=config)
