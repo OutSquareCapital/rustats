@@ -11,7 +11,7 @@ pub fn move_sum<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Sum>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Sum>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -22,7 +22,7 @@ pub fn move_mean<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Mean>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Mean>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -33,7 +33,7 @@ pub fn move_var<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Var>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Var>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -44,7 +44,7 @@ pub fn move_std<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Stdev>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Stdev>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -55,7 +55,7 @@ pub fn move_skewness<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Skewness>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Skewness>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -66,7 +66,7 @@ pub fn move_kurtosis<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_accumulator_template::<clc::Kurtosis>(py, array, length, min_length, parallel)
+    tmpl::move_accumulator::<clc::Kurtosis>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -77,7 +77,7 @@ pub fn move_min<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_deque_template::<clc::Min>(py, array, length, min_length, parallel)
+    tmpl::move_deque::<clc::Min>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -88,7 +88,7 @@ pub fn move_max<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_deque_template::<clc::Max>(py, array, length, min_length, parallel)
+    tmpl::move_deque::<clc::Max>(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -99,7 +99,7 @@ pub fn move_median<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_indexed_template(py, array, length, min_length, parallel)
+    tmpl::move_indexed(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]
@@ -110,7 +110,7 @@ pub fn move_rank<'py>(
     min_length: usize,
     parallel: bool
 ) -> tmpl::ArrayOutput {
-    tmpl::move_valid_count_template(py, array, length, min_length, parallel)
+    tmpl::move_valid_count(py, array, length, min_length, parallel)
 }
 
 #[pyfunction]

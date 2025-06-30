@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
 
-pub fn move_indexed_template<'py>(
+pub fn move_indexed<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
@@ -25,18 +25,18 @@ pub fn move_indexed_template<'py>(
                 .into_par_iter()
                 .zip(output_columns.par_iter_mut())
                 .for_each(|(input_col, output_col)| {
-                    process_indexed_column(&input_col, output_col, length, min_length, num_rows);
+                    process_indexed(&input_col, output_col, length, min_length, num_rows);
                 });
         } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_indexed_column(&input_col, output_col, length, min_length, num_rows);
+                process_indexed(&input_col, output_col, length, min_length, num_rows);
             }
         }
     });
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_valid_count_template<'py>(
+pub fn move_valid_count<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
@@ -54,24 +54,18 @@ pub fn move_valid_count_template<'py>(
                 .into_par_iter()
                 .zip(output_columns.par_iter_mut())
                 .for_each(|(input_col, output_col)| {
-                    process_valid_count_column(
-                        &input_col,
-                        output_col,
-                        length,
-                        min_length,
-                        num_rows
-                    );
+                    process_valid_count(&input_col, output_col, length, min_length, num_rows);
                 });
         } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_valid_count_column(&input_col, output_col, length, min_length, num_rows);
+                process_valid_count(&input_col, output_col, length, min_length, num_rows);
             }
         }
     });
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_accumulator_template<Stat: clc::StatCalculator>(
+pub fn move_accumulator<Stat: clc::StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
@@ -89,7 +83,7 @@ pub fn move_accumulator_template<Stat: clc::StatCalculator>(
                 .into_par_iter()
                 .zip(output_columns.par_iter_mut())
                 .for_each(|(input_col, output_col)| {
-                    process_stat_column::<Stat>(
+                    process_accumulator::<Stat>(
                         &input_col,
                         output_col,
                         length,
@@ -99,14 +93,14 @@ pub fn move_accumulator_template<Stat: clc::StatCalculator>(
                 });
         } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_stat_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
+                process_accumulator::<Stat>(&input_col, output_col, length, min_length, num_rows);
             }
         }
     });
     Ok(output.into_pyarray(py).into())
 }
 
-pub fn move_deque_template<Stat: clc::DequeStatCalculator>(
+pub fn move_deque<Stat: clc::DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
@@ -124,24 +118,18 @@ pub fn move_deque_template<Stat: clc::DequeStatCalculator>(
                 .into_par_iter()
                 .zip(output_columns.par_iter_mut())
                 .for_each(|(input_col, output_col)| {
-                    process_deque_column::<Stat>(
-                        &input_col,
-                        output_col,
-                        length,
-                        min_length,
-                        num_rows
-                    );
+                    process_deque::<Stat>(&input_col, output_col, length, min_length, num_rows);
                 });
         } else {
             for (input_col, output_col) in input_columns.iter().zip(output_columns.iter_mut()) {
-                process_deque_column::<Stat>(&input_col, output_col, length, min_length, num_rows);
+                process_deque::<Stat>(&input_col, output_col, length, min_length, num_rows);
             }
         }
     });
     Ok(output.into_pyarray(py).into())
 }
 
-fn process_stat_column<Stat: clc::StatCalculator>(
+fn process_accumulator<Stat: clc::StatCalculator>(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -172,7 +160,7 @@ fn process_stat_column<Stat: clc::StatCalculator>(
     }
 }
 
-fn process_deque_column<Stat: clc::DequeStatCalculator>(
+fn process_deque<Stat: clc::DequeStatCalculator>(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -206,7 +194,7 @@ fn process_deque_column<Stat: clc::DequeStatCalculator>(
     }
 }
 
-pub fn process_valid_count_column(
+pub fn process_valid_count(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
@@ -249,7 +237,7 @@ pub fn process_valid_count_column(
     }
 }
 
-fn process_indexed_column(
+fn process_indexed(
     input_col: &ArrayView1<f64>,
     output_col: &mut ArrayViewMut1<f64>,
     length: usize,
