@@ -12,7 +12,7 @@ from structs import (
 )
 
 
-def get_line_check(df: pl.DataFrame, iterations: int) -> pl.DataFrame:
+def get_line_check(df: pl.LazyFrame, iterations: int) -> pl.LazyFrame:
     return df.with_columns(pl.arange(0, iterations, 1).alias("Iteration"))
 
 
@@ -47,8 +47,8 @@ def get_array(file: Files) -> NDArray[np.float64]:
 
 def get_absolute_results(
     results: list[Result], config: BenchmarkConfig, time_target: int
-) -> pl.DataFrame:
-    df = pl.DataFrame(
+) -> pl.LazyFrame:
+    df = pl.LazyFrame(
         data={
             ColNames.LIBRARY: [r.library for r in results],
             ColNames.GROUP: [r.group for r in results],
@@ -67,12 +67,11 @@ def get_absolute_results(
 
 
 def get_relative_results(
-    df: pl.DataFrame, config: BenchmarkConfig, time_target: int
-) -> pl.DataFrame:
-    df = (
+    df: pl.LazyFrame, config: BenchmarkConfig, time_target: int
+) -> pl.LazyFrame:
+    relative = (
         (
-            df.lazy()
-            .group_by([ColNames.GROUP, ColNames.LIBRARY])
+            df.group_by([ColNames.GROUP, ColNames.LIBRARY])
             .agg(pl.col(ColNames.TIME_MS).mean().alias("avg_time"), maintain_order=True)
             .collect()
             .pivot(values="avg_time", index=ColNames.GROUP, on=ColNames.LIBRARY)
@@ -99,12 +98,14 @@ def get_relative_results(
             .with_columns(pl.col(ColNames.LIBRARY).cast(Schemas.library_enum))
         )
         .sort(by=[ColNames.GROUP, ColNames.LIBRARY])
-        .collect()
     )
     _save_history(
-        df=df, config=config, file=Files.RELATIVE_HISTORY, time_target=time_target
+        df=relative,
+        config=config,
+        file=Files.RELATIVE_HISTORY,
+        time_target=time_target,
     )
-    return df
+    return relative
 
 
 def save_group_passes(
@@ -168,11 +169,11 @@ def get_data_distribution(df: pl.LazyFrame, limit: float) -> pl.DataFrame:
 
 
 def _save_history(
-    df: pl.DataFrame, config: BenchmarkConfig, file: str, time_target: int
+    df: pl.LazyFrame, config: BenchmarkConfig, file: str, time_target: int
 ) -> None:
     current_data = pl.scan_ndjson(source=file, schema=Schemas.HISTORY)
 
-    new_data = _get_new_history(df=df.lazy(), config=config, time_target=time_target)
+    new_data = _get_new_history(df=df, config=config, time_target=time_target)
 
     pl.concat([current_data, new_data]).sort(
         by=[ColNames.GROUP, ColNames.LIBRARY, ColNames.VERSION, ColNames.TIME_TARGET],
