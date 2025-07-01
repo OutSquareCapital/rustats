@@ -345,6 +345,12 @@ impl ValidCounter {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.greater_count = 0;
+        self.equal_count = 1;
+        self.valid_count = 1;
+    }
+
     pub fn get(&self) -> f64 {
         stats::rank(self.greater_count, self.equal_count, self.valid_count as f64)
     }

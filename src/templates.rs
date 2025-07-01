@@ -105,7 +105,7 @@ pub fn move_indexed<'py>(
     )
 }
 
-pub fn move_valid_count<'py>(
+pub fn move_valid_count_old<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
@@ -143,6 +143,61 @@ pub fn move_valid_count<'py>(
                 }
 
                 let mut rank_count = clc::ValidCounter::new();
+                let start_idx: usize = row - length + 1;
+                for j in start_idx..row {
+                    let other: f64 = input_col[j];
+                    rank_count.add(other, current);
+                }
+
+                if rank_count.valid_count >= min_length {
+                    output_col[row] = rank_count.get();
+                }
+            }
+        }
+    )
+}
+
+
+pub fn move_valid_count<'py>(
+    py: Python<'py>,
+    array: PyReadonlyArray2<'py, f64>,
+    length: usize,
+    min_length: usize,
+    parallel: bool
+) -> ArrayOutput {
+    process_with_strategy(
+        py,
+        array,
+        length,
+        min_length,
+        parallel,
+        |input_col, output_col, length, min_length, num_rows| {
+            let mut rank_count = clc::ValidCounter::new();
+            for row in min_length - 1..length {
+                rank_count.reset();
+                let current: f64 = input_col[row];
+                if current.is_nan() {
+                    continue;
+                }
+
+
+                for j in 0..row {
+                    let other: f64 = input_col[j];
+                    rank_count.add(other, current);
+                }
+
+                if rank_count.valid_count >= min_length {
+                    output_col[row] = rank_count.get();
+                }
+            }
+
+            for row in length..num_rows {
+                rank_count.reset();
+                let current: f64 = input_col[row];
+                if current.is_nan() {
+                    continue;
+                }
+
                 let start_idx: usize = row - length + 1;
                 for j in start_idx..row {
                     let other: f64 = input_col[j];
