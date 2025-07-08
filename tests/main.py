@@ -8,6 +8,7 @@ from manager import BenchmarkManager
 
 
 def main(manager: BenchmarkManager, config: BenchmarkConfig) -> None:
+    print(f"\nCurrent version: {config.version}")
     while True:
         _display_menu()
         choice: str = input("Enter your choice> ").strip()
