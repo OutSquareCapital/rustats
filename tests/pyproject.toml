@@ -15,6 +15,7 @@ dependencies = [
     "plotly-stubs>=0.0.5",
     "polars>=1.8.2",
     "pyarrow>=20.0.0",
+    "pychain",
     "rustats",
 ]
 
@@ -22,3 +23,4 @@ dependencies = [
 rustats = { git = "https://github.com/OutSquareCapital/rustats.git" }
 bn-typed = { git = "https://github.com/OutSquareCapital/bn-typed.git" }
 nbg-typed = { git = "https://github.com/OutSquareCapital/nbg-typed.git" }
+pychain = { git = "https://github.com/OutSquareCapital/pychain.git" }
