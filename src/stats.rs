@@ -1,6 +1,10 @@
+use std::ops::{Div, Mul, Sub};
+
 #[inline(always)]
 pub fn var(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
-    (sum_square / obs - (sum_simple / obs).powi(2)) * (obs / (obs - 1.0))
+    sum_square
+        .sub(sum_simple.powi(2).div(obs))
+        .div(obs.sub(1.0))
 }
 
 #[inline(always)]
@@ -10,39 +14,53 @@ pub fn stdev(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
 
 #[inline(always)]
 pub fn skew(sum_simple: f64, sum_square: f64, sum_cube: f64, obs: f64) -> f64 {
-    let mean_value: f64 = sum_simple / obs;
-    let variance_value: f64 = var(sum_simple, sum_square, obs);
-    let skew_numerator: f64 =
-        sum_cube / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
-
-    let std_dev: f64 = variance_value.sqrt();
-
-    let skew: f64 = ((obs * (obs - 1.0)).sqrt() * skew_numerator) / ((obs - 2.0) * std_dev.powi(3));
-    skew
+    (obs.mul(obs.sub(1.0)))
+        .sqrt()
+        .mul(
+            sum_cube
+                .div(obs)
+                .sub(sum_simple.div(obs).powi(3))
+                .sub(3.0)
+                .mul(sum_simple.div(obs))
+                .mul(var(sum_simple, sum_square, obs)),
+        )
+        .div((obs.sub(2.0)).mul(var(sum_simple, sum_square, obs).sqrt().powi(3)))
 }
 
 #[inline(always)]
 pub fn kurtosis(sum_simple: f64, sum_square: f64, sum_cube: f64, sum_quad: f64, obs: f64) -> f64 {
-    let mean_value: f64 = sum_simple / obs;
-    let variance_value: f64 = var(sum_simple, sum_square, obs);
-    let skew_numerator: f64 =
-        sum_cube / obs - mean_value.powi(3) - 3.0 * mean_value * variance_value;
-
-    let kurtosis_term: f64 =
-        sum_quad / obs -
-        mean_value.powi(4) -
-        6.0 * variance_value * mean_value.powi(2) -
-        4.0 * skew_numerator * mean_value;
-
-    let kurt: f64 =
-        (((obs * obs - 1.0) * kurtosis_term) / variance_value.powi(2) - 3.0 * (obs - 1.0).powi(2)) /
-        ((obs - 2.0) * (obs - 3.0));
-    kurt
+    (obs.mul(obs).sub(1.0))
+        .mul(
+            sum_quad
+                .div(obs)
+                .sub(sum_simple.div(obs).powi(4))
+                .sub(
+                    6.0.mul(var(sum_simple, sum_square, obs))
+                        .mul(sum_simple.div(obs).powi(2)),
+                )
+                .sub(
+                    4.0.mul(
+                        sum_cube
+                            .div(
+                                obs.sub(sum_simple.div(obs).powi(3)).sub(
+                                    3.0.mul(sum_simple.div(obs))
+                                        .mul(var(sum_simple, sum_square, obs)),
+                                ),
+                            )
+                            .mul(sum_simple.div(obs)),
+                    ),
+                ),
+        )
+        .div(
+            var(sum_simple, sum_square, obs)
+                .powi(2)
+                .sub(3.0.mul(obs.sub(1.0)).powi(2)),
+        )
+        .div((obs.sub(2.0)).mul(obs.sub(3.0)))
 }
 
 #[inline(always)]
 pub fn rank(greater_count: usize, equal_count: usize, obs: f64) -> f64 {
-    let raw_rank: f64 = (greater_count + equal_count - 1) as f64;
-    let normalized_rank: f64 = 2.0 * ((0.5 * raw_rank) / (obs - 1.0) - 0.5);
-    normalized_rank
+    let raw_rank: f64 = (greater_count + equal_count.sub(1)) as f64;
+    2.0.mul((0.5.mul(raw_rank)).div(obs.sub(1.0)).sub(0.5))
 }
