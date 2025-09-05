@@ -1,7 +1,8 @@
-use numpy::{ PyArray2, PyReadonlyArray2, IntoPyArray, ndarray as nd };
+use crate::calculators as clc;
+use numpy::{ndarray as nd, IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use crate::calculators as clc;
+use std::ops::{Add, Not, Sub};
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
 
@@ -11,10 +12,10 @@ fn process_with_strategy<F>(
     length: usize,
     min_length: usize,
     parallel: bool,
-    process_fn: F
+    process_fn: F,
 ) -> ArrayOutput
-    where
-        F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync
+where
+    F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, usize, usize, usize) + Send + Sync,
 {
     let array = array.as_array();
     let (num_rows, num_cols) = array.dim();
@@ -45,7 +46,7 @@ pub fn move_indexed<'py>(
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
     min_length: usize,
-    parallel: bool
+    parallel: bool,
 ) -> ArrayOutput {
     process_with_strategy(
         py,
@@ -69,7 +70,7 @@ pub fn move_indexed<'py>(
 
                 processor.equilibrate();
 
-                if window.observations >= min_length {
+                if window.observations.ge(&min_length) {
                     if processor.check() {
                         if let Some((val, _)) = processor.small_heap.peek() {
                             output_col[row] = val;
@@ -84,14 +85,14 @@ pub fn move_indexed<'py>(
                 window.current = input_col[row];
                 processor.deque.push_back((window.current, row));
 
-                if !window.current.is_nan() {
+                if window.current.is_nan().not() {
                     window.observations += 1;
                     processor.push_values(window.current, row);
                 }
                 processor.remove(&mut window, length);
                 processor.equilibrate();
 
-                if window.observations >= min_length {
+                if window.observations.ge(&min_length) {
                     if processor.check() {
                         if let Some((val, _)) = processor.small_heap.peek() {
                             output_col[row] = val;
@@ -101,69 +102,16 @@ pub fn move_indexed<'py>(
                     }
                 }
             }
-        }
+        },
     )
 }
-
-pub fn move_valid_count_old<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    length: usize,
-    min_length: usize,
-    parallel: bool
-) -> ArrayOutput {
-    process_with_strategy(
-        py,
-        array,
-        length,
-        min_length,
-        parallel,
-        |input_col, output_col, length, min_length, num_rows| {
-            for row in min_length - 1..length {
-                let current: f64 = input_col[row];
-                if current.is_nan() {
-                    continue;
-                }
-
-                let mut rank_count = clc::ValidCounter::new();
-                for j in 0..row {
-                    let other: f64 = input_col[j];
-                    rank_count.add(other, current);
-                }
-
-                if rank_count.valid_count >= min_length {
-                    output_col[row] = rank_count.get();
-                }
-            }
-
-            for row in length..num_rows {
-                let current: f64 = input_col[row];
-                if current.is_nan() {
-                    continue;
-                }
-
-                let mut rank_count = clc::ValidCounter::new();
-                let start_idx: usize = row - length + 1;
-                for j in start_idx..row {
-                    let other: f64 = input_col[j];
-                    rank_count.add(other, current);
-                }
-
-                if rank_count.valid_count >= min_length {
-                    output_col[row] = rank_count.get();
-                }
-            }
-        }
-    )
-}
-
 
 pub fn move_valid_count<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
     length: usize,
     min_length: usize,
-    parallel: bool
+    parallel: bool,
 ) -> ArrayOutput {
     process_with_strategy(
         py,
@@ -180,13 +128,11 @@ pub fn move_valid_count<'py>(
                     continue;
                 }
 
-
                 for j in 0..row {
-                    let other: f64 = input_col[j];
-                    rank_count.add(other, current);
+                    rank_count.add(input_col[j], current);
                 }
 
-                if rank_count.valid_count >= min_length {
+                if rank_count.valid_count.ge(&min_length) {
                     output_col[row] = rank_count.get();
                 }
             }
@@ -197,18 +143,15 @@ pub fn move_valid_count<'py>(
                 if current.is_nan() {
                     continue;
                 }
-
-                let start_idx: usize = row - length + 1;
-                for j in start_idx..row {
-                    let other: f64 = input_col[j];
-                    rank_count.add(other, current);
+                for j in row.sub(length).add(1)..row {
+                    rank_count.add(input_col[j], current);
                 }
 
-                if rank_count.valid_count >= min_length {
+                if rank_count.valid_count.ge(&min_length) {
                     output_col[row] = rank_count.get();
                 }
             }
-        }
+        },
     )
 }
 
@@ -217,7 +160,7 @@ pub fn move_accumulator<Stat: clc::StatCalculator>(
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
     min_length: usize,
-    parallel: bool
+    parallel: bool,
 ) -> ArrayOutput {
     process_with_strategy(
         py,
@@ -226,31 +169,29 @@ pub fn move_accumulator<Stat: clc::StatCalculator>(
         min_length,
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
-            {
-                let mut state = Stat::new();
-                let mut window = clc::WindowState::new();
+            let mut state = Stat::new();
+            let mut window = clc::WindowState::new();
 
-                for row in 0..length {
-                    window.current = input_col[row];
-                    if !window.current.is_nan() {
-                        window.observations += 1;
-                        Stat::add_value(&mut state, window.current);
-                    }
-
-                    if window.observations >= min_length {
-                        output_col[row] = Stat::get(&state, window.observations);
-                    }
+            for row in 0..length {
+                window.current = input_col[row];
+                if window.current.is_nan().not() {
+                    window.observations += 1;
+                    Stat::add_value(&mut state, window.current);
                 }
 
-                for row in length..num_rows {
-                    window.refresh(&input_col, row, length);
-                    window.compute_row::<Stat>(&mut state);
-                    if window.observations >= min_length {
-                        output_col[row] = Stat::get(&state, window.observations);
-                    }
+                if window.observations.ge(&min_length) {
+                    output_col[row] = Stat::get(&state, window.observations);
                 }
             }
-        }
+
+            for row in length..num_rows {
+                window.refresh(&input_col, row, length);
+                window.compute_row::<Stat>(&mut state);
+                if window.observations.ge(&min_length) {
+                    output_col[row] = Stat::get(&state, window.observations);
+                }
+            }
+        },
     )
 }
 
@@ -259,7 +200,7 @@ pub fn move_deque<Stat: clc::DequeStatCalculator>(
     array: PyReadonlyArray2<'_, f64>,
     length: usize,
     min_length: usize,
-    parallel: bool
+    parallel: bool,
 ) -> ArrayOutput {
     process_with_strategy(
         py,
@@ -268,33 +209,31 @@ pub fn move_deque<Stat: clc::DequeStatCalculator>(
         min_length,
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
-            {
-                let mut deque = Stat::new();
-                let mut window = clc::WindowState::new();
+            let mut deque = Stat::new();
+            let mut window = clc::WindowState::new();
 
-                for row in 0..length {
-                    window.current = input_col[row];
-                    if !window.current.is_nan() {
-                        window.observations += 1;
-                        Stat::add_value(&mut deque, window.current, row);
-                    }
-                    if window.observations >= min_length {
-                        if let Some(&(val, _)) = deque.front() {
-                            output_col[row] = val;
-                        }
-                    }
+            for row in 0..length {
+                window.current = input_col[row];
+                if !window.current.is_nan() {
+                    window.observations += 1;
+                    Stat::add_value(&mut deque, window.current, row);
                 }
-
-                for row in length..num_rows {
-                    window.refresh(&input_col, row, length);
-                    window.compute_deque_row::<Stat>(&mut deque, row);
-                    if window.observations >= min_length {
-                        if let Some(&(val, _)) = deque.front() {
-                            output_col[row] = val;
-                        }
+                if window.observations.ge(&min_length) {
+                    if let Some(&(val, _)) = deque.front() {
+                        output_col[row] = val;
                     }
                 }
             }
-        }
+
+            for row in length..num_rows {
+                window.refresh(&input_col, row, length);
+                window.compute_deque_row::<Stat>(&mut deque, row);
+                if window.observations.ge(&min_length) {
+                    if let Some(&(val, _)) = deque.front() {
+                        output_col[row] = val;
+                    }
+                }
+            }
+        },
     )
 }

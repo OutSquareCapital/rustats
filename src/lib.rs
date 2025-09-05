@@ -45,56 +45,6 @@ define_move_functions!(
     (move_rank, tmpl::move_valid_count, ())
 );
 
-#[pyfunction]
-pub fn agg_sum<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_mean<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_var<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_std<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_skewness<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_kurtosis<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_min<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_max<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_median<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
-#[pyfunction]
-pub fn agg_rank<'py>() -> tmpl::ArrayOutput {
-    todo!()
-}
-
 #[pymodule(name = "rustats")]
 fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_sum, module)?)?;
@@ -107,15 +57,5 @@ fn rustats(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(move_skewness, module)?)?;
     module.add_function(wrap_pyfunction!(move_kurtosis, module)?)?;
     module.add_function(wrap_pyfunction!(move_rank, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_sum, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_std, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_var, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_mean, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_max, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_min, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_skewness, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_kurtosis, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_median, module)?)?;
-    module.add_function(wrap_pyfunction!(agg_rank, module)?)?;
     Ok(())
 }

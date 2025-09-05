@@ -1,7 +1,7 @@
 use crate::stats;
 use numpy::ndarray as nd;
 use std::collections::VecDeque;
-
+use std::ops::{Add, Div, Mul, Neg, Sub};
 pub struct Squared {
     sum_simple: f64,
     sum_square: f64,
@@ -219,18 +219,18 @@ impl StatCalculator for Skewness {
         state.sum_simple += value;
         state.sum_square += value.powi(2);
 
-        let temp: f64 = value.powi(3) - state.compensation_cube;
-        let total: f64 = state.sum_cube + temp;
-        state.compensation_cube = total - state.sum_cube - temp;
+        let temp: f64 = value.powi(3).sub(state.compensation_cube);
+        let total: f64 = state.sum_cube.add(temp);
+        state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple -= value;
         state.sum_square -= value.powi(2);
 
-        let temp: f64 = -value.powi(3) - state.compensation_cube;
-        let total: f64 = state.sum_cube + temp;
-        state.compensation_cube = total - state.sum_cube - temp;
+        let temp: f64 = -value.neg().powi(3).sub(state.compensation_cube);
+        let total: f64 = state.sum_cube.add(temp);
+        state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
@@ -253,28 +253,28 @@ impl StatCalculator for Kurtosis {
         state.sum_simple += value;
         state.sum_square += value.powi(2);
 
-        let temp: f64 = value.powi(3) - state.compensation_cube;
-        let total: f64 = state.sum_cube + temp;
-        state.compensation_cube = total - state.sum_cube - temp;
+        let temp: f64 = value.powi(3).sub(state.compensation_cube);
+        let total: f64 = state.sum_cube.add(temp);
+        state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
 
-        let temp: f64 = value.powi(4) - state.compensation_quad;
-        let total: f64 = state.sum_quad + temp;
-        state.compensation_quad = total - state.sum_quad - temp;
+        let temp: f64 = value.powi(4).sub(state.compensation_quad);
+        let total: f64 = state.sum_quad.add(temp);
+        state.compensation_quad = total.sub(state.sum_quad).sub(temp);
         state.sum_quad = total;
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple -= value;
         state.sum_square -= value.powi(2);
 
-        let temp: f64 = -value.powi(3) - state.compensation_cube;
-        let total: f64 = state.sum_cube + temp;
-        state.compensation_cube = total - state.sum_cube - temp;
+        let temp: f64 = -value.powi(3).sub(state.compensation_cube);
+        let total: f64 = state.sum_cube.add(temp);
+        state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
 
-        let temp: f64 = -value.powi(4) - state.compensation_quad;
-        let total: f64 = state.sum_quad + temp;
-        state.compensation_quad = total - state.sum_quad - temp;
+        let temp: f64 = -value.powi(4).sub(state.compensation_quad);
+        let total: f64 = state.sum_quad.add(temp);
+        state.compensation_quad = total.sub(state.sum_quad).sub(temp);
         state.sum_quad = total;
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
@@ -296,7 +296,7 @@ impl DequeStatCalculator for Min {
 
     fn add_value(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
-            if val > value {
+            if val.gt(&value) {
                 deque.pop_back();
             } else {
                 break;
@@ -343,9 +343,9 @@ impl ValidCounter {
             return;
         }
         self.valid_count += 1;
-        if current > other {
+        if current.gt(&other) {
             self.greater_count += 1;
-        } else if current == other {
+        } else if current.eq(&other) {
             self.equal_count += 1;
         }
     }
@@ -380,10 +380,13 @@ impl HeapIndexed {
         }
     }
 
+    pub fn last(&self) -> f64 {
+        self.peek().unwrap().0
+    }
+
     #[inline(always)]
     pub fn compare(&self, a: f64, b: f64) -> bool {
-        let result: bool = a > b;
-        result == self.is_max_heap
+        a.gt(&b).eq(&self.is_max_heap)
     }
     #[inline(always)]
     pub fn peek(&self) -> Option<(f64, usize)> {
@@ -419,15 +422,16 @@ impl HeapIndexed {
         if let Some(pos) = self.positions[idx] {
             self.positions[idx] = None;
 
-            if pos == self.heap.len() - 1 {
+            if pos.eq(&self.heap.len().sub(1)) {
                 self.heap.pop();
             } else {
                 let last: (f64, usize) = self.heap.pop().unwrap();
                 self.heap[pos] = last;
                 self.positions[last.1] = Some(pos);
 
-                let parent: usize = pos.saturating_sub(1) / 2;
-                if pos > 0 && self.compare(self.heap[pos].0, self.heap[parent].0) {
+                if pos.gt(&0)
+                    && self.compare(self.heap[pos].0, self.heap[pos.saturating_sub(1).div(2)].0)
+                {
                     self.sift_up(pos);
                 } else {
                     self.sift_down(pos);
@@ -441,7 +445,7 @@ impl HeapIndexed {
     #[inline(always)]
     fn sift_up(&mut self, mut pos: usize) {
         while pos > 0 {
-            let parent: usize = (pos - 1) / 2;
+            let parent: usize = (pos.sub(1)).div(2);
             if !self.compare(self.heap[pos].0, self.heap[parent].0) {
                 break;
             }
@@ -460,14 +464,14 @@ impl HeapIndexed {
         let node_idx: usize = self.heap[pos].1;
 
         loop {
-            let left: usize = 2 * pos + 1;
-            if left >= len {
+            let left: usize = 2.mul(pos).add(1);
+            if left.ge(&len) {
                 break;
             }
 
-            let right: usize = left + 1;
+            let right: usize = left.add(1);
             let target: usize =
-                if right < len && self.compare(self.heap[right].0, self.heap[left].0) {
+                if right.ge(&len) && self.compare(self.heap[right].0, self.heap[left].0) {
                     right
                 } else {
                     left
@@ -495,7 +499,7 @@ impl IndexedProcessor {
     pub fn new(capacity: usize, max_idx: usize) -> Self {
         let small_heap = HeapIndexed::new(capacity, max_idx, true);
         let large_heap = HeapIndexed::new(capacity, max_idx, false);
-        let deque = VecDeque::with_capacity(capacity + 1);
+        let deque = VecDeque::with_capacity(capacity.add(1));
 
         Self {
             small_heap,
@@ -506,7 +510,7 @@ impl IndexedProcessor {
     pub fn push_values(&mut self, current: f64, row: usize) {
         {
             if let Some((max_small, _)) = self.small_heap.peek() {
-                if current > max_small {
+                if current.gt(&max_small) {
                     self.large_heap.push(current, row);
                 } else {
                     self.small_heap.push(current, row);
@@ -517,13 +521,18 @@ impl IndexedProcessor {
         }
     }
     pub fn equilibrate(&mut self) {
-        while self.small_heap.heap.len() > self.large_heap.heap.len() + 1 {
+        while self
+            .small_heap
+            .heap
+            .len()
+            .gt(&self.large_heap.heap.len().add(1))
+        {
             if let Some((val, idx)) = self.small_heap.pop() {
                 self.large_heap.push(val, idx);
             }
         }
 
-        while self.large_heap.heap.len() > self.small_heap.heap.len() {
+        while self.large_heap.heap.len().gt(&self.small_heap.heap.len()) {
             if let Some((val, idx)) = self.large_heap.pop() {
                 self.small_heap.push(val, idx);
             }
@@ -549,8 +558,6 @@ impl IndexedProcessor {
     }
 
     pub fn get(&self) -> f64 {
-        let smallest: f64 = self.small_heap.peek().unwrap().0;
-        let largest: f64 = self.large_heap.peek().unwrap().0;
-        (smallest + largest) / 2.0
+        (self.small_heap.last().add(self.large_heap.last())).div(2.0)
     }
 }
