@@ -1,7 +1,7 @@
 use crate::stats;
 use numpy::ndarray as nd;
 use std::collections::VecDeque;
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Not, Sub, SubAssign};
 pub struct Squared {
     sum_simple: f64,
     sum_square: f64,
@@ -83,18 +83,18 @@ impl WindowState {
         length: usize,
     ) {
         self.current = input_col[row];
-        self.precedent_idx = row - length;
+        self.precedent_idx = row.sub(length);
         self.precedent = input_col[self.precedent_idx];
     }
     #[inline(always)]
     pub fn compute_row<Calculator: StatCalculator>(&mut self, state: &mut Calculator::Accumulator) {
         if !self.current.is_nan() {
-            self.observations += 1;
+            self.observations.add_assign(1);
             Calculator::add_value(state, self.current);
         }
 
         if !self.precedent.is_nan() {
-            self.observations -= 1;
+            self.observations.sub_assign(1);
             Calculator::remove_value(state, self.precedent);
         }
     }
@@ -105,16 +105,16 @@ impl WindowState {
         row: usize,
     ) {
         if !self.precedent.is_nan() {
-            self.observations -= 1;
+            self.observations.sub_assign(1);
             if let Some(&(_, front_idx)) = deque.front() {
-                if front_idx == self.precedent_idx {
+                if front_idx.eq(&self.precedent_idx) {
                     deque.pop_front();
                 }
             }
         }
 
-        if !self.current.is_nan() {
-            self.observations += 1;
+        if self.current.is_nan().not() {
+            self.observations.add_assign(1);
             Calculator::add_value(deque, self.current, row);
         }
     }
@@ -176,12 +176,12 @@ impl StatCalculator for Var {
         Squared::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple += value;
-        state.sum_square += value.powi(2);
+        state.sum_simple.add_assign(value);
+        state.sum_square.add_assign(value.powi(2));
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple -= value;
-        state.sum_square -= value.powi(2);
+        state.sum_simple.sub_assign(value);
+        state.sum_square.sub_assign(value.powi(2));
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
         stats::var(state.sum_simple, state.sum_square, count as f64)
@@ -196,12 +196,12 @@ impl StatCalculator for Stdev {
         Squared::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple += value;
-        state.sum_square += value.powi(2);
+        state.sum_simple.add_assign(value);
+        state.sum_square.add_assign(value.powi(2));
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple -= value;
-        state.sum_square -= value.powi(2);
+        state.sum_simple.sub_assign(value);
+        state.sum_square.sub_assign(value.powi(2));
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
         stats::stdev(state.sum_simple, state.sum_square, count as f64)
@@ -250,8 +250,8 @@ impl StatCalculator for Kurtosis {
         Quadratric::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple += value;
-        state.sum_square += value.powi(2);
+        state.sum_simple.add_assign(value);
+        state.sum_square.add_assign(value.powi(2));
 
         let temp: f64 = value.powi(3).sub(state.compensation_cube);
         let total: f64 = state.sum_cube.add(temp);
@@ -314,7 +314,7 @@ impl DequeStatCalculator for Max {
 
     fn add_value(deque: &mut VecDeque<(f64, usize)>, value: f64, idx: usize) {
         while let Some(&(val, _)) = deque.back() {
-            if val < value {
+            if val.gt(&value) {
                 deque.pop_back();
             } else {
                 break;
@@ -544,7 +544,7 @@ impl IndexedProcessor {
             (window.precedent, window.precedent_idx) = self.deque.pop_front().unwrap();
 
             if !window.precedent.is_nan() {
-                window.observations -= 1;
+                window.observations.sub_assign(1);
 
                 if self.small_heap.remove(window.precedent_idx) {
                 } else {

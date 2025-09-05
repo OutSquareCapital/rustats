@@ -2,7 +2,7 @@ use crate::calculators as clc;
 use numpy::{ndarray as nd, IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use std::ops::{Add, Not, Sub};
+use std::ops::{Add, AddAssign, Not, Sub};
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
 
@@ -63,7 +63,7 @@ pub fn move_indexed<'py>(
 
                 processor.deque.push_back((window.current, row));
 
-                if !window.current.is_nan() {
+                if window.current.is_nan().not() {
                     window.observations += 1;
                     processor.push_values(window.current, row);
                 }
@@ -75,7 +75,7 @@ pub fn move_indexed<'py>(
                         if let Some((val, _)) = processor.small_heap.peek() {
                             output_col[row] = val;
                         }
-                    } else if !processor.small_heap.heap.is_empty() {
+                    } else if processor.small_heap.heap.is_empty().not() {
                         output_col[row] = processor.get();
                     }
                 }
@@ -86,7 +86,7 @@ pub fn move_indexed<'py>(
                 processor.deque.push_back((window.current, row));
 
                 if window.current.is_nan().not() {
-                    window.observations += 1;
+                    window.observations.add_assign(1);
                     processor.push_values(window.current, row);
                 }
                 processor.remove(&mut window, length);
@@ -121,7 +121,7 @@ pub fn move_valid_count<'py>(
         parallel,
         |input_col, output_col, length, min_length, num_rows| {
             let mut rank_count = clc::ValidCounter::new();
-            for row in min_length - 1..length {
+            for row in min_length.sub(1)..length {
                 rank_count.reset();
                 let current: f64 = input_col[row];
                 if current.is_nan() {
@@ -175,7 +175,7 @@ pub fn move_accumulator<Stat: clc::StatCalculator>(
             for row in 0..length {
                 window.current = input_col[row];
                 if window.current.is_nan().not() {
-                    window.observations += 1;
+                    window.observations.add_assign(1);
                     Stat::add_value(&mut state, window.current);
                 }
 
@@ -215,7 +215,7 @@ pub fn move_deque<Stat: clc::DequeStatCalculator>(
             for row in 0..length {
                 window.current = input_col[row];
                 if !window.current.is_nan() {
-                    window.observations += 1;
+                    window.observations.add_assign(1);
                     Stat::add_value(&mut deque, window.current, row);
                 }
                 if window.observations.ge(&min_length) {
