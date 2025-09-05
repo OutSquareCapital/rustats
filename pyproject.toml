@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "rustats"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -17,3 +17,10 @@ dependencies = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 profile = "release"
+
+[dependency-groups]
+dev = [
+    "bottleneck>=1.5.0",
+    "plotly>=6.3.0",
+    "polars>=1.33.0",
+]
