@@ -1,6 +1,6 @@
 use crate::stats;
-use std::collections::VecDeque;
 use numpy::ndarray as nd;
+use std::collections::VecDeque;
 
 pub struct Squared {
     sum_simple: f64,
@@ -80,7 +80,7 @@ impl WindowState {
         &mut self,
         input_col: &nd::ArrayBase<nd::ViewRepr<&f64>, nd::Dim<[usize; 1]>>,
         row: usize,
-        length: usize
+        length: usize,
     ) {
         self.current = input_col[row];
         self.precedent_idx = row - length;
@@ -102,7 +102,7 @@ impl WindowState {
     pub fn compute_deque_row<Calculator: DequeStatCalculator>(
         &mut self,
         deque: &mut VecDeque<(f64, usize)>,
-        row: usize
+        row: usize,
     ) {
         if !self.precedent.is_nan() {
             self.observations -= 1;
@@ -234,7 +234,12 @@ impl StatCalculator for Skewness {
         state.sum_cube = total;
     }
     fn get(state: &Self::Accumulator, count: usize) -> f64 {
-        stats::skew(state.sum_simple, state.sum_square, state.sum_cube, count as f64)
+        stats::skew(
+            state.sum_simple,
+            state.sum_square,
+            state.sum_cube,
+            count as f64,
+        )
     }
 }
 pub struct Kurtosis;
@@ -278,7 +283,7 @@ impl StatCalculator for Kurtosis {
             state.sum_square,
             state.sum_cube,
             state.sum_quad,
-            count as f64
+            count as f64,
         )
     }
 }
@@ -339,7 +344,7 @@ impl ValidCounter {
         }
         self.valid_count += 1;
         if current > other {
-            self.greater_count += 2;
+            self.greater_count += 1;
         } else if current == other {
             self.equal_count += 1;
         }
@@ -352,7 +357,11 @@ impl ValidCounter {
     }
 
     pub fn get(&self) -> f64 {
-        stats::rank(self.greater_count, self.equal_count, self.valid_count as f64)
+        stats::rank(
+            self.greater_count,
+            self.equal_count,
+            self.valid_count as f64,
+        )
     }
 }
 
@@ -457,14 +466,12 @@ impl HeapIndexed {
             }
 
             let right: usize = left + 1;
-            let target: usize = if
-                right < len &&
-                self.compare(self.heap[right].0, self.heap[left].0)
-            {
-                right
-            } else {
-                left
-            };
+            let target: usize =
+                if right < len && self.compare(self.heap[right].0, self.heap[left].0) {
+                    right
+                } else {
+                    left
+                };
 
             if !self.compare(self.heap[target].0, node_value) {
                 break;
@@ -538,7 +545,7 @@ impl IndexedProcessor {
         }
     }
     pub fn check(&self) -> bool {
-        self.small_heap.heap.len() > self.large_heap.heap.len()
+        self.small_heap.heap.len().gt(&self.large_heap.heap.len())
     }
 
     pub fn get(&self) -> f64 {

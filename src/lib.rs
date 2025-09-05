@@ -1,7 +1,7 @@
-use pyo3::prelude::*;
 use numpy::PyReadonlyArray2;
-mod stats;
+use pyo3::prelude::*;
 mod calculators;
+mod stats;
 mod templates;
 
 use crate::calculators as clc;
@@ -29,8 +29,16 @@ define_move_functions!(
     (move_mean, tmpl::move_accumulator::<clc::Mean>, clc::Mean),
     (move_var, tmpl::move_accumulator::<clc::Var>, clc::Var),
     (move_std, tmpl::move_accumulator::<clc::Stdev>, clc::Stdev),
-    (move_skewness, tmpl::move_accumulator::<clc::Skewness>, clc::Skewness),
-    (move_kurtosis, tmpl::move_accumulator::<clc::Kurtosis>, clc::Kurtosis),
+    (
+        move_skewness,
+        tmpl::move_accumulator::<clc::Skewness>,
+        clc::Skewness
+    ),
+    (
+        move_kurtosis,
+        tmpl::move_accumulator::<clc::Kurtosis>,
+        clc::Kurtosis
+    ),
     (move_min, tmpl::move_deque::<clc::Min>, clc::Min),
     (move_max, tmpl::move_deque::<clc::Max>, clc::Max),
     (move_median, tmpl::move_indexed, ()),
