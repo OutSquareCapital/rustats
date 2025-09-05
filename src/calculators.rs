@@ -1,64 +1,8 @@
+use crate::accumulators as acc;
 use crate::stats;
 use numpy::ndarray as nd;
 use std::collections::VecDeque;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Not, Sub, SubAssign};
-pub struct Squared {
-    sum_simple: f64,
-    sum_square: f64,
-}
-
-impl Squared {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
-        }
-    }
-}
-
-pub struct Cubic {
-    sum_simple: f64,
-    sum_square: f64,
-    sum_cube: f64,
-    compensation_cube: f64,
-}
-
-impl Cubic {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
-            sum_cube: 0.0,
-            compensation_cube: 0.0,
-        }
-    }
-}
-
-pub struct Quadratric {
-    sum_simple: f64,
-    sum_square: f64,
-    sum_cube: f64,
-    compensation_cube: f64,
-    sum_quad: f64,
-    compensation_quad: f64,
-}
-
-impl Quadratric {
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
-            sum_cube: 0.0,
-            compensation_cube: 0.0,
-            sum_quad: 0.0,
-            compensation_quad: 0.0,
-        }
-    }
-}
-
 pub struct WindowState {
     pub observations: usize,
     pub current: f64,
@@ -170,10 +114,10 @@ impl StatCalculator for Mean {
 }
 pub struct Var;
 impl StatCalculator for Var {
-    type Accumulator = Squared;
+    type Accumulator = acc::Squared;
 
     fn new() -> Self::Accumulator {
-        Squared::new()
+        acc::Squared::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple.add_assign(value);
@@ -190,10 +134,10 @@ impl StatCalculator for Var {
 
 pub struct Stdev;
 impl StatCalculator for Stdev {
-    type Accumulator = Squared;
+    type Accumulator = acc::Squared;
 
     fn new() -> Self::Accumulator {
-        Squared::new()
+        acc::Squared::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple.add_assign(value);
@@ -210,10 +154,10 @@ impl StatCalculator for Stdev {
 
 pub struct Skewness;
 impl StatCalculator for Skewness {
-    type Accumulator = Cubic;
+    type Accumulator = acc::Cubic;
 
     fn new() -> Self::Accumulator {
-        Cubic::new()
+        acc::Cubic::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple += value;
@@ -244,10 +188,10 @@ impl StatCalculator for Skewness {
 }
 pub struct Kurtosis;
 impl StatCalculator for Kurtosis {
-    type Accumulator = Quadratric;
+    type Accumulator = acc::Quadratric;
 
     fn new() -> Self::Accumulator {
-        Quadratric::new()
+        acc::Quadratric::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
         state.sum_simple.add_assign(value);

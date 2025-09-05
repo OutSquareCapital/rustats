@@ -1,9 +1,9 @@
 use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
+mod accumulators;
 mod calculators;
 mod stats;
 mod templates;
-
 use crate::calculators as clc;
 use crate::templates as tmpl;
 
