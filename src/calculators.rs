@@ -32,12 +32,12 @@ impl WindowState {
     }
     #[inline(always)]
     pub fn compute_row<Calculator: StatCalculator>(&mut self, state: &mut Calculator::Accumulator) {
-        if !self.current.is_nan() {
+        if self.current.is_nan().not() {
             self.observations.add_assign(1);
             Calculator::add_value(state, self.current);
         }
 
-        if !self.precedent.is_nan() {
+        if self.precedent.is_nan().not() {
             self.observations.sub_assign(1);
             Calculator::remove_value(state, self.precedent);
         }
@@ -48,7 +48,7 @@ impl WindowState {
         deque: &mut VecDeque<(f64, usize)>,
         row: usize,
     ) {
-        if !self.precedent.is_nan() {
+        if self.precedent.is_nan().not() {
             self.observations.sub_assign(1);
             if let Some(&(_, front_idx)) = deque.front() {
                 if front_idx.eq(&self.precedent_idx) {
@@ -160,8 +160,8 @@ impl StatCalculator for Skewness {
         acc::Cubic::new()
     }
     fn add_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple += value;
-        state.sum_square += value.powi(2);
+        state.sum_simple.add_assign(value);
+        state.sum_square.add_assign(value.powi(2));
 
         let temp: f64 = value.powi(3).sub(state.compensation_cube);
         let total: f64 = state.sum_cube.add(temp);
@@ -169,10 +169,10 @@ impl StatCalculator for Skewness {
         state.sum_cube = total;
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple -= value;
-        state.sum_square -= value.powi(2);
+        state.sum_simple.sub_assign(value);
+        state.sum_square.sub_assign(value.powi(2));
 
-        let temp: f64 = -value.neg().powi(3).sub(state.compensation_cube);
+        let temp: f64 = value.neg().powi(3).sub(state.compensation_cube);
         let total: f64 = state.sum_cube.add(temp);
         state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
@@ -208,15 +208,15 @@ impl StatCalculator for Kurtosis {
         state.sum_quad = total;
     }
     fn remove_value(state: &mut Self::Accumulator, value: f64) {
-        state.sum_simple -= value;
-        state.sum_square -= value.powi(2);
+        state.sum_simple.sub_assign(value);
+        state.sum_square.sub_assign(value.powi(2));
 
-        let temp: f64 = -value.powi(3).sub(state.compensation_cube);
+        let temp: f64 = value.neg().powi(3).sub(state.compensation_cube);
         let total: f64 = state.sum_cube.add(temp);
         state.compensation_cube = total.sub(state.sum_cube).sub(temp);
         state.sum_cube = total;
 
-        let temp: f64 = -value.powi(4).sub(state.compensation_quad);
+        let temp: f64 = value.neg().powi(4).sub(state.compensation_quad);
         let total: f64 = state.sum_quad.add(temp);
         state.compensation_quad = total.sub(state.sum_quad).sub(temp);
         state.sum_quad = total;
@@ -286,11 +286,11 @@ impl ValidCounter {
         if other.is_nan() {
             return;
         }
-        self.valid_count += 1;
+        self.valid_count.add_assign(1);
         if current.gt(&other) {
-            self.greater_count += 1;
+            self.greater_count.add_assign(1);
         } else if current.eq(&other) {
-            self.equal_count += 1;
+            self.equal_count.add_assign(1);
         }
     }
 
@@ -353,7 +353,7 @@ impl HeapIndexed {
         self.positions[result.1] = None;
 
         let last: (f64, usize) = self.heap.pop().unwrap();
-        if !self.heap.is_empty() {
+        if self.heap.is_empty().not() {
             self.heap[0] = last;
             self.positions[last.1] = Some(0);
             self.sift_down(0);
@@ -388,9 +388,9 @@ impl HeapIndexed {
     }
     #[inline(always)]
     fn sift_up(&mut self, mut pos: usize) {
-        while pos > 0 {
+        while pos.gt(&0) {
             let parent: usize = (pos.sub(1)).div(2);
-            if !self.compare(self.heap[pos].0, self.heap[parent].0) {
+            if self.compare(self.heap[pos].0, self.heap[parent].0).not() {
                 break;
             }
 
@@ -421,7 +421,7 @@ impl HeapIndexed {
                     left
                 };
 
-            if !self.compare(self.heap[target].0, node_value) {
+            if self.compare(self.heap[target].0, node_value).not() {
                 break;
             }
             self.heap[pos] = self.heap[target];
@@ -484,10 +484,10 @@ impl IndexedProcessor {
     }
 
     pub fn remove(&mut self, window: &mut WindowState, length: usize) {
-        if self.deque.len() > length {
+        if self.deque.len().gt(&length) {
             (window.precedent, window.precedent_idx) = self.deque.pop_front().unwrap();
 
-            if !window.precedent.is_nan() {
+            if window.precedent.is_nan().not() {
                 window.observations.sub_assign(1);
 
                 if self.small_heap.remove(window.precedent_idx) {

@@ -64,7 +64,7 @@ pub fn move_indexed<'py>(
                 processor.deque.push_back((window.current, row));
 
                 if window.current.is_nan().not() {
-                    window.observations += 1;
+                    window.observations.add_assign(1);
                     processor.push_values(window.current, row);
                 }
 
@@ -97,7 +97,7 @@ pub fn move_indexed<'py>(
                         if let Some((val, _)) = processor.small_heap.peek() {
                             output_col[row] = val;
                         }
-                    } else if !processor.small_heap.heap.is_empty() {
+                    } else if processor.small_heap.heap.is_empty().not() {
                         output_col[row] = processor.get();
                     }
                 }
