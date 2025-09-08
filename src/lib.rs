@@ -2,6 +2,7 @@ use numpy::PyReadonlyArray2;
 use pyo3::prelude::*;
 mod accumulators;
 mod calculators;
+mod heaps;
 mod stats;
 mod templates;
 use crate::calculators as clc;

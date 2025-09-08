@@ -1,11 +1,14 @@
-use crate::calculators as clc;
+use crate::calculators::{DequeStatCalculator, StatCalculator, ValidCounter, WindowState};
+use crate::heaps::IndexedProcessor;
 use numpy::{ndarray as nd, IntoPyArray, PyArray2, PyReadonlyArray2};
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use std::ops::{Add, AddAssign, Not, Sub};
+use std::{
+    collections::VecDeque,
+    ops::{Add, AddAssign, Not, Sub},
+};
 
 pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
-
 pub struct WindowConfig {
     pub length: usize,
     pub min_length: usize,
@@ -58,56 +61,56 @@ pub fn move_indexed<'py>(
         array,
         config,
         |input_col, output_col, config, num_rows| {
-            let mut processor = clc::IndexedProcessor::new(config.length, num_rows);
-            let mut window = clc::WindowState::new();
+            let mut processor = IndexedProcessor::new(config.length, num_rows);
+            let mut window = WindowState::new();
+            (0..config.length).for_each(|row| {
+                process_indexed(&mut window, input_col, &mut processor, row);
+                finalize_indexed(&mut window, &mut processor, output_col, row, &config);
+            });
 
-            for row in 0..config.length {
-                window.current = input_col[row];
-
-                processor.deque.push_back((window.current, row));
-
-                if window.current.is_nan().not() {
-                    window.observations.add_assign(1);
-                    processor.push_values(window.current, row);
-                }
-
-                processor.equilibrate();
-
-                if window.observations.ge(&config.min_length) {
-                    if processor.check() {
-                        if let Some((val, _)) = processor.small_heap.peek() {
-                            output_col[row] = val;
-                        }
-                    } else if processor.small_heap.heap.is_empty().not() {
-                        output_col[row] = processor.get();
-                    }
-                }
-            }
-            for row in config.length..num_rows {
-                window.current = input_col[row];
-                processor.deque.push_back((window.current, row));
-
-                if window.current.is_nan().not() {
-                    window.observations.add_assign(1);
-                    processor.push_values(window.current, row);
-                }
+            (config.length..num_rows).for_each(|row| {
+                process_indexed(&mut window, input_col, &mut processor, row);
                 processor.remove(&mut window, config.length);
-                processor.equilibrate();
-
-                if window.observations.ge(&config.min_length) {
-                    if processor.check() {
-                        if let Some((val, _)) = processor.small_heap.peek() {
-                            output_col[row] = val;
-                        }
-                    } else if processor.small_heap.heap.is_empty().not() {
-                        output_col[row] = processor.get();
-                    }
-                }
-            }
+                finalize_indexed(&mut window, &mut processor, output_col, row, &config);
+            });
         },
     )
 }
 
+fn process_indexed(
+    window: &mut WindowState,
+    input_col: &nd::ArrayView1<f64>,
+    processor: &mut IndexedProcessor,
+    row: usize,
+) {
+    window.current = input_col[row];
+    processor.deque.push_back((window.current, row));
+
+    if window.current.is_nan().not() {
+        window.observations.add_assign(1);
+        processor.push_values(window.current, row);
+    }
+}
+
+fn finalize_indexed(
+    window: &mut WindowState,
+    processor: &mut IndexedProcessor,
+    output_col: &mut nd::ArrayViewMut1<f64>,
+    row: usize,
+    config: &WindowConfig,
+) {
+    processor.equilibrate();
+
+    if window.observations.ge(&config.min_length) {
+        if processor.check() {
+            if let Some((val, _)) = processor.small_heap.peek() {
+                output_col[row] = val;
+            }
+        } else if processor.small_heap.heap.is_empty().not() {
+            output_col[row] = processor.get();
+        }
+    }
+}
 pub fn move_valid_count<'py>(
     py: Python<'py>,
     array: PyReadonlyArray2<'py, f64>,
@@ -118,7 +121,7 @@ pub fn move_valid_count<'py>(
         array,
         config,
         |input_col, output_col, config, num_rows| {
-            let mut rank_count = clc::ValidCounter::new();
+            let mut rank_count = ValidCounter::new();
             for row in config.min_length.sub(1)..config.length {
                 rank_count.reset();
                 let current: f64 = input_col[row];
@@ -153,7 +156,7 @@ pub fn move_valid_count<'py>(
     )
 }
 
-pub fn move_accumulator<Stat: clc::StatCalculator>(
+pub fn move_accumulator<Stat: StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     config: WindowConfig,
@@ -164,32 +167,37 @@ pub fn move_accumulator<Stat: clc::StatCalculator>(
         config,
         |input_col, output_col, config, num_rows| {
             let mut state = Stat::new();
-            let mut window = clc::WindowState::new();
+            let mut window = WindowState::new();
 
-            for row in 0..config.length {
+            (0..config.length).for_each(|row| {
                 window.current = input_col[row];
                 if window.current.is_nan().not() {
                     window.observations.add_assign(1);
                     Stat::add_value(&mut state, window.current);
                 }
+                finalize_accumulator::<Stat>(&window, &state, output_col, row, &config);
+            });
 
-                if window.observations.ge(&config.min_length) {
-                    output_col[row] = Stat::get(&state, window.observations);
-                }
-            }
-
-            for row in config.length..num_rows {
+            (config.length..num_rows).for_each(|row| {
                 window.refresh(&input_col, row, config.length);
                 window.compute_row::<Stat>(&mut state);
-                if window.observations.ge(&config.min_length) {
-                    output_col[row] = Stat::get(&state, window.observations);
-                }
-            }
+                finalize_accumulator::<Stat>(&window, &state, output_col, row, &config);
+            });
         },
     )
 }
-
-pub fn move_deque<Stat: clc::DequeStatCalculator>(
+fn finalize_accumulator<Stat: StatCalculator>(
+    window: &WindowState,
+    state: &<Stat as StatCalculator>::Accumulator,
+    output_col: &mut nd::ArrayViewMut1<f64>,
+    row: usize,
+    config: &WindowConfig,
+) {
+    if window.observations.ge(&config.min_length) {
+        output_col[row] = Stat::get(&state, window.observations);
+    }
+}
+pub fn move_deque<Stat: DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     config: WindowConfig,
@@ -200,30 +208,36 @@ pub fn move_deque<Stat: clc::DequeStatCalculator>(
         config,
         |input_col, output_col, config, num_rows| {
             let mut deque = Stat::new();
-            let mut window = clc::WindowState::new();
+            let mut window = WindowState::new();
 
-            for row in 0..config.length {
+            (0..config.length).for_each(|row| {
                 window.current = input_col[row];
-                if !window.current.is_nan() {
+                if window.current.is_nan().not() {
                     window.observations.add_assign(1);
                     Stat::add_value(&mut deque, window.current, row);
                 }
-                if window.observations.ge(&config.min_length) {
-                    if let Some(&(val, _)) = deque.front() {
-                        output_col[row] = val;
-                    }
-                }
-            }
+                finalize_deque(&window, &mut deque, output_col, row, &config);
+            });
 
-            for row in config.length..num_rows {
+            (config.length..num_rows).for_each(|row| {
                 window.refresh(&input_col, row, config.length);
                 window.compute_deque_row::<Stat>(&mut deque, row);
-                if window.observations.ge(&config.min_length) {
-                    if let Some(&(val, _)) = deque.front() {
-                        output_col[row] = val;
-                    }
-                }
-            }
+                finalize_deque(&window, &mut deque, output_col, row, &config);
+            });
         },
     )
+}
+
+fn finalize_deque(
+    window: &WindowState,
+    deque: &mut VecDeque<(f64, usize)>,
+    output_col: &mut nd::ArrayViewMut1<f64>,
+    row: usize,
+    config: &WindowConfig,
+) {
+    if window.observations.ge(&config.min_length) {
+        if let Some(&(val, _)) = deque.front() {
+            output_col[row] = val;
+        }
+    }
 }
