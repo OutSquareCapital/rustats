@@ -3,9 +3,7 @@ from numpy.typing import NDArray
 
 type _FloatArray = NDArray[np.float64]
 
-def move_sum[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_sum[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving sum of an array.
 
     Example:
@@ -17,9 +15,7 @@ def move_sum[T: _FloatArray](
     """
     ...
 
-def move_std[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_std[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving standard deviation of an array.
 
     Example:
@@ -31,9 +27,7 @@ def move_std[T: _FloatArray](
     """
     ...
 
-def move_var[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_var[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving variance of an array.
 
     Example:
@@ -45,9 +39,7 @@ def move_var[T: _FloatArray](
     """
     ...
 
-def move_mean[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_mean[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving mean of an array.
 
     Example:
@@ -59,9 +51,7 @@ def move_mean[T: _FloatArray](
     """
     ...
 
-def move_max[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_max[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving maximum of an array.
 
     Example:
@@ -73,9 +63,7 @@ def move_max[T: _FloatArray](
     """
     ...
 
-def move_min[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_min[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving minimum of an array.
 
     Example:
@@ -87,9 +75,7 @@ def move_min[T: _FloatArray](
     """
     ...
 
-def move_median[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_median[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving median of an array.
 
     Example:
@@ -101,9 +87,7 @@ def move_median[T: _FloatArray](
     """
     ...
 
-def move_skewness[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_skewness[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving skewness of an array.
 
     Example:
@@ -115,9 +99,7 @@ def move_skewness[T: _FloatArray](
     """
     ...
 
-def move_kurtosis[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_kurtosis[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving kurtosis of an array.
 
     Example:
@@ -129,9 +111,7 @@ def move_kurtosis[T: _FloatArray](
     """
     ...
 
-def move_rank[T: _FloatArray](
-    array: T, length: int, min_length: int, parallel: bool
-) -> T:
+def move_rank[T: _FloatArray](array: T, length: int, min_length: int) -> T:
     """Calculate the moving rank of an array.
 
     Example:

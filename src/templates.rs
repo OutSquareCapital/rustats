@@ -1,62 +1,54 @@
 use crate::calculators::{DequeStatCalculator, StatCalculator, ValidCounter, WindowState};
+use crate::engines::{process_1d, process_2d, Array1DOutput, Array2DOutput, WindowConfig};
 use crate::heaps::IndexedProcessor;
-use numpy::{ndarray as nd, IntoPyArray, PyArray2, PyReadonlyArray2};
+use numpy::{ndarray as nd, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
-use rayon::prelude::*;
 use std::{
     collections::VecDeque,
-    ops::{Add, AddAssign, Not, Sub},
+    ops::{Add, AddAssign, Not, Sub, SubAssign},
 };
 
-pub type ArrayOutput = PyResult<Py<PyArray2<f64>>>;
-pub struct WindowConfig {
-    pub length: usize,
-    pub min_length: usize,
-    pub parallel: bool,
+pub fn move_indexed_1d(
+    py: Python<'_>,
+    array: PyReadonlyArray1<'_, f64>,
+    config: WindowConfig,
+) -> Array1DOutput {
+    process_1d(py, array, config, |input, output, config, num_rows| {
+        let mut processor = IndexedProcessor::new(config.length, num_rows);
+        let mut window = WindowState::new();
+
+        (0..config.length).for_each(|row| {
+            window.current = input[row];
+            processor.deque.push_back((window.current, row));
+
+            if window.current.is_nan().not() {
+                window.observations.add_assign(1);
+                processor.push_values(window.current, row);
+            }
+            finalize_indexed(&mut window, &mut processor, output, row, &config);
+        });
+
+        (config.length..num_rows).for_each(|row| {
+            window.current = input[row];
+            processor.deque.push_back((window.current, row));
+
+            if window.current.is_nan().not() {
+                window.observations.add_assign(1);
+                processor.push_values(window.current, row);
+            }
+
+            processor.remove(&mut window, config.length);
+            finalize_indexed(&mut window, &mut processor, output, row, &config);
+        });
+    })
 }
 
-fn process_with_strategy<F>(
+pub fn move_indexed_2d(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     config: WindowConfig,
-    process_fn: F,
-) -> ArrayOutput
-where
-    F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, &WindowConfig, usize) + Send + Sync,
-{
-    let array_view = array.as_array();
-    let (num_rows, num_cols) = array_view.dim();
-    let mut output = nd::Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
-    let input_columns: Vec<_> = array_view.columns().into_iter().collect();
-    let mut output_columns: Vec<_> = output.columns_mut().into_iter().collect();
-
-    py.allow_threads(move || {
-        if config.parallel {
-            input_columns
-                .into_par_iter()
-                .zip(output_columns.par_iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_fn(&input_col, output_col, &config, num_rows);
-                });
-        } else {
-            input_columns
-                .iter()
-                .zip(output_columns.iter_mut())
-                .for_each(|(input_col, output_col)| {
-                    process_fn(&input_col, output_col, &config, num_rows);
-                });
-        }
-    });
-
-    Ok(output.into_pyarray(py).into())
-}
-
-pub fn move_indexed<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
-    config: WindowConfig,
-) -> ArrayOutput {
-    process_with_strategy(
+) -> Array2DOutput {
+    process_2d(
         py,
         array,
         config,
@@ -111,12 +103,54 @@ fn finalize_indexed(
         }
     }
 }
-pub fn move_valid_count<'py>(
-    py: Python<'py>,
-    array: PyReadonlyArray2<'py, f64>,
+
+pub fn move_valid_count_1d(
+    py: Python<'_>,
+    array: PyReadonlyArray1<'_, f64>,
     config: WindowConfig,
-) -> ArrayOutput {
-    process_with_strategy(
+) -> Array1DOutput {
+    process_1d(py, array, config, |input, output, config, num_rows| {
+        let mut rank_count = ValidCounter::new();
+
+        (config.min_length.sub(1)..config.length).for_each(|row| {
+            rank_count.reset();
+            let current: f64 = input[row];
+            if current.is_nan() {
+                return;
+            }
+
+            (0..row).for_each(|j| {
+                rank_count.add(input[j], current);
+            });
+
+            if rank_count.valid_count.ge(&config.min_length) {
+                output[row] = rank_count.get();
+            }
+        });
+
+        (config.length..num_rows).for_each(|row| {
+            rank_count.reset();
+            let current: f64 = input[row];
+            if current.is_nan() {
+                return;
+            }
+            (row.sub(config.length).add(1)..row).for_each(|j| {
+                rank_count.add(input[j], current);
+            });
+
+            if rank_count.valid_count.ge(&config.min_length) {
+                output[row] = rank_count.get();
+            }
+        });
+    })
+}
+
+pub fn move_valid_count_2d(
+    py: Python<'_>,
+    array: PyReadonlyArray2<'_, f64>,
+    config: WindowConfig,
+) -> Array2DOutput {
+    process_2d(
         py,
         array,
         config,
@@ -156,12 +190,40 @@ pub fn move_valid_count<'py>(
     )
 }
 
-pub fn move_accumulator<Stat: StatCalculator>(
+pub fn move_accumulator_1d<Stat: StatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray1<'_, f64>,
+    config: WindowConfig,
+) -> Array1DOutput {
+    process_1d(py, array, config, |input, output, config, num_rows| {
+        let mut state = Stat::new();
+        let mut window = WindowState::new();
+
+        (0..config.length).for_each(|row| {
+            window.current = input[row];
+            if window.current.is_nan().not() {
+                window.observations.add_assign(1);
+                Stat::add_value(&mut state, window.current);
+            }
+            finalize_accumulator::<Stat>(&window, &state, output, row, &config);
+        });
+
+        (config.length..num_rows).for_each(|row| {
+            window.current = input[row];
+            window.precedent_idx = row.sub(config.length);
+            window.precedent = input[window.precedent_idx];
+            window.compute_row::<Stat>(&mut state);
+            finalize_accumulator::<Stat>(&window, &state, output, row, &config);
+        });
+    })
+}
+
+pub fn move_accumulator_2d<Stat: StatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     config: WindowConfig,
-) -> ArrayOutput {
-    process_with_strategy(
+) -> Array2DOutput {
+    process_2d(
         py,
         array,
         config,
@@ -186,6 +248,7 @@ pub fn move_accumulator<Stat: StatCalculator>(
         },
     )
 }
+
 fn finalize_accumulator<Stat: StatCalculator>(
     window: &WindowState,
     state: &<Stat as StatCalculator>::Accumulator,
@@ -197,12 +260,55 @@ fn finalize_accumulator<Stat: StatCalculator>(
         output_col[row] = Stat::get(&state, window.observations);
     }
 }
-pub fn move_deque<Stat: DequeStatCalculator>(
+
+pub fn move_deque_1d<Stat: DequeStatCalculator>(
+    py: Python<'_>,
+    array: PyReadonlyArray1<'_, f64>,
+    config: WindowConfig,
+) -> Array1DOutput {
+    process_1d(py, array, config, |input, output, config, num_rows| {
+        let mut deque = Stat::new();
+        let mut window = WindowState::new();
+
+        (0..config.length).for_each(|row| {
+            window.current = input[row];
+            if window.current.is_nan().not() {
+                window.observations.add_assign(1);
+                Stat::add_value(&mut deque, window.current, row);
+            }
+            finalize_deque(&window, &mut deque, output, row, &config);
+        });
+
+        (config.length..num_rows).for_each(|row| {
+            window.current = input[row];
+            window.precedent_idx = row.sub(config.length);
+            window.precedent = input[window.precedent_idx];
+
+            if window.precedent.is_nan().not() {
+                window.observations.sub_assign(1);
+                if let Some(&(_, front_idx)) = deque.front() {
+                    if front_idx.eq(&window.precedent_idx) {
+                        deque.pop_front();
+                    }
+                }
+            }
+
+            if window.current.is_nan().not() {
+                window.observations.add_assign(1);
+                Stat::add_value(&mut deque, window.current, row);
+            }
+
+            finalize_deque(&window, &mut deque, output, row, &config);
+        });
+    })
+}
+
+pub fn move_deque_2d<Stat: DequeStatCalculator>(
     py: Python<'_>,
     array: PyReadonlyArray2<'_, f64>,
     config: WindowConfig,
-) -> ArrayOutput {
-    process_with_strategy(
+) -> Array2DOutput {
+    process_2d(
         py,
         array,
         config,
