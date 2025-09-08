@@ -14,33 +14,33 @@ pub fn stdev(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
 
 #[inline(always)]
 pub fn skew(sum_simple: f64, sum_square: f64, sum_cube: f64, obs: f64) -> f64 {
+    let mean = sum_simple.div(obs);
+    let variance = var(sum_simple, sum_square, obs);
     (obs.mul(obs.sub(1.0)))
         .sqrt()
         .mul(
             sum_cube
                 .div(obs)
-                .sub(sum_simple.div(obs).powi(3))
+                .sub(mean.powi(3))
                 .sub(3.0)
-                .mul(sum_simple.div(obs))
-                .mul(var(sum_simple, sum_square, obs)),
+                .mul(mean)
+                .mul(variance),
         )
-        .div((obs.sub(2.0)).mul(var(sum_simple, sum_square, obs).sqrt().powi(3)))
+        .div((obs.sub(2.0)).mul(variance.sqrt().powi(3)))
 }
 
 #[inline(always)]
 pub fn kurtosis(sum_simple: f64, sum_square: f64, sum_cube: f64, sum_quad: f64, obs: f64) -> f64 {
+    let mean = sum_simple.div(obs);
     obs.sub(1.0)
         .mul(
             obs.add(1.0)
                 .mul(
                     sum_quad
                         .div(obs)
-                        .sub(4.0.mul(sum_simple.div(obs)).mul(sum_cube.div(obs)))
-                        .add(
-                            6.0.mul(sum_simple.div(obs).powi(2))
-                                .mul(sum_square.div(obs)),
-                        )
-                        .sub(3.0.mul(sum_simple.div(obs).powi(4))),
+                        .sub(4.0.mul(mean).mul(sum_cube.div(obs)))
+                        .add(6.0.mul(mean.powi(2)).mul(sum_square.div(obs)))
+                        .sub(3.0.mul(mean.powi(4))),
                 )
                 .div(var(sum_simple, sum_square, obs).powi(2))
                 .sub(3.0.mul(obs.sub(1.0))),

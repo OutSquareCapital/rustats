@@ -18,7 +18,12 @@ macro_rules! define_move_functions {
                 min_length: usize,
                 parallel: bool
             ) -> tmpl::ArrayOutput {
-                $processor(py, array, length, min_length, parallel)
+                let config = tmpl::WindowConfig {
+                    length,
+                    min_length,
+                    parallel,
+                };
+                $processor(py, array, config)
             }
         )*
     };
