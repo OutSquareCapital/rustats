@@ -1,6 +1,9 @@
 import rustats as rs
 import polars as pl
+from collections.abc import Callable
 from pathlib import Path
+import numpy as np
+import bottleneck as bn  # type: ignore
 
 
 def path_src():
@@ -12,41 +15,22 @@ def path_src():
     )
 
 
+def compute(expr: pl.Expr, func: Callable[[np.ndarray, int, int], np.ndarray]):
+    return expr.map_batches(
+        lambda x: func(x.to_numpy(), 3, 2),
+        pl.Float32,
+    )
+
+
 def test():
-    """
-    shape: (100, 2)
-    ┌────────┬───────────┐
-    │ ticker ┆ close     │
-    │ ---    ┆ ---       │
-    │ enum   ┆ f64       │
-    ╞════════╪═══════════╡
-    │ SPY    ┆ null      │
-    │ SPY    ┆ 24.991655 │
-    │ SPY    ┆ 25.003249 │
-    │ SPY    ┆ 25.032235 │
-    │ SPY    ┆ 24.96847  │
-    │ …      ┆ …         │
-    │ SPY    ┆ 25.14584  │
-    │ SPY    ┆ 25.099941 │
-    │ SPY    ┆ 25.047145 │
-    │ SPY    ┆ 25.088207 │
-    │ SPY    ┆ 25.117536 │
-    └────────┴───────────┘
-    """
     return (
-        pl.scan_parquet(path_src())
+        pl.scan_parquet(path_src())  # type: ignore
         .head(100)
-        .select(
-            pl.col("ticker"),
-            pl.col("close")
-            .cast(pl.Float64)
-            .map_batches(
-                lambda x: rs.move_mean(x.to_numpy().reshape(-1, 1), 3, 2, True),
-                pl.List(pl.Float64),
-            )
-            .over(pl.col("ticker"))
-            .list.explode()
-            .fill_nan(None),
+        .group_by("ticker")
+        .agg(
+            pl.col("close").pipe(compute, rs.move_mean).alias("rustats"),
+            pl.col("close").pipe(compute, bn.move_mean).alias("bottleneck"),  # type: ignore
+            pl.col("close").rolling_mean(3, min_samples=2).alias("polars"),
         )
     )
 

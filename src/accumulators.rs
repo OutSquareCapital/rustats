@@ -1,56 +1,57 @@
-pub struct Squared {
-    pub sum_simple: f64,
-    pub sum_square: f64,
+use ndarray::NdFloat;
+pub struct Squared<T: NdFloat> {
+    pub sum_simple: T,
+    pub sum_square: T,
 }
 
-impl Squared {
+impl<T: NdFloat> Squared<T> {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
+            sum_simple: T::zero(),
+            sum_square: T::zero(),
         }
     }
 }
 
-pub struct Cubic {
-    pub sum_simple: f64,
-    pub sum_square: f64,
-    pub sum_cube: f64,
-    pub compensation_cube: f64,
+pub struct Cubic<T: NdFloat> {
+    pub sum_simple: T,
+    pub sum_square: T,
+    pub sum_cube: T,
+    pub compensation_cube: T,
 }
 
-impl Cubic {
+impl<T: NdFloat> Cubic<T> {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
-            sum_cube: 0.0,
-            compensation_cube: 0.0,
+            sum_simple: T::zero(),
+            sum_square: T::zero(),
+            sum_cube: T::zero(),
+            compensation_cube: T::zero(),
         }
     }
 }
 
-pub struct Quadratric {
-    pub sum_simple: f64,
-    pub sum_square: f64,
-    pub sum_cube: f64,
-    pub compensation_cube: f64,
-    pub sum_quad: f64,
-    pub compensation_quad: f64,
+pub struct Quadratric<T: NdFloat> {
+    pub sum_simple: T,
+    pub sum_square: T,
+    pub sum_cube: T,
+    pub compensation_cube: T,
+    pub sum_quad: T,
+    pub compensation_quad: T,
 }
 
-impl Quadratric {
+impl<T: NdFloat> Quadratric<T> {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            sum_simple: 0.0,
-            sum_square: 0.0,
-            sum_cube: 0.0,
-            compensation_cube: 0.0,
-            sum_quad: 0.0,
-            compensation_quad: 0.0,
+            sum_simple: T::zero(),
+            sum_square: T::zero(),
+            sum_cube: T::zero(),
+            compensation_cube: T::zero(),
+            sum_quad: T::zero(),
+            compensation_quad: T::zero(),
         }
     }
 }

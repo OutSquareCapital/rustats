@@ -1,58 +1,70 @@
-use std::ops::{Add, Div, Mul, Sub};
+use ndarray::NdFloat;
 
 #[inline(always)]
-pub fn var(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
+pub fn var<T: NdFloat>(sum_simple: T, sum_square: T, obs: T) -> T {
     sum_square
         .sub(sum_simple.powi(2).div(obs))
-        .div(obs.sub(1.0))
+        .div(obs.sub(T::one()))
 }
 
 #[inline(always)]
-pub fn stdev(sum_simple: f64, sum_square: f64, obs: f64) -> f64 {
+pub fn stdev<T: NdFloat>(sum_simple: T, sum_square: T, obs: T) -> T {
     var(sum_simple, sum_square, obs).sqrt()
 }
 
 #[inline(always)]
-pub fn skew(sum_simple: f64, sum_square: f64, sum_cube: f64, obs: f64) -> f64 {
+pub fn skew<T: NdFloat>(sum_simple: T, sum_square: T, sum_cube: T, obs: T) -> T {
     let mean = sum_simple.div(obs);
     let variance = var(sum_simple, sum_square, obs);
-    (obs.mul(obs.sub(1.0)))
+    let one = T::one();
+    let two = one.add(one);
+    let three = one.add(two);
+    (obs.mul(obs.sub(one)))
         .sqrt()
         .mul(
             sum_cube
                 .div(obs)
                 .sub(mean.powi(3))
-                .sub(3.0)
+                .sub(three)
                 .mul(mean)
                 .mul(variance),
         )
-        .div((obs.sub(2.0)).mul(variance.sqrt().powi(3)))
+        .div((obs.sub(two)).mul(variance.sqrt().powi(3)))
 }
 
 #[inline(always)]
-pub fn kurtosis(sum_simple: f64, sum_square: f64, sum_cube: f64, sum_quad: f64, obs: f64) -> f64 {
+pub fn kurtosis<T: NdFloat>(sum_simple: T, sum_square: T, sum_cube: T, sum_quad: T, obs: T) -> T {
     let mean = sum_simple.div(obs);
-    obs.sub(1.0)
+    let one = T::one();
+    let two = one.add(one);
+    let three = one.add(two);
+    let four = two.add(two);
+    let six = three.add(three);
+
+    obs.sub(one)
         .mul(
-            obs.add(1.0)
+            obs.add(one)
                 .mul(
                     sum_quad
                         .div(obs)
-                        .sub(4.0.mul(mean).mul(sum_cube.div(obs)))
-                        .add(6.0.mul(mean.powi(2)).mul(sum_square.div(obs)))
-                        .sub(3.0.mul(mean.powi(4))),
+                        .sub(four.mul(mean).mul(sum_cube.div(obs)))
+                        .add(six.mul(mean.powi(2)).mul(sum_square.div(obs)))
+                        .sub(three.mul(mean.powi(4))),
                 )
                 .div(var(sum_simple, sum_square, obs).powi(2))
-                .sub(3.0.mul(obs.sub(1.0))),
+                .sub(three.mul(obs.sub(one))),
         )
-        .div(obs.sub(2.0).mul(obs.sub(3.0)))
+        .div(obs.sub(two).mul(obs.sub(three)))
 }
 
 #[inline(always)]
-pub fn rank(greater_count: usize, equal_count: usize, obs: f64) -> f64 {
-    2.0.mul(
-        (0.5.mul((greater_count.add(equal_count).sub(1)) as f64))
-            .div(obs.sub(1.0))
-            .sub(0.5),
+pub fn rank<T: NdFloat>(greater_count: T, equal_count: T, obs: T) -> T {
+    let one = T::one();
+    let two = one.add(one);
+    let half = one.div(two);
+    two.mul(
+        (half.mul(greater_count.add(equal_count).sub(one)))
+            .div(obs.sub(one))
+            .sub(half),
     )
 }

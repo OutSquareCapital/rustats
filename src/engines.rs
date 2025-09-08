@@ -2,45 +2,43 @@ use numpy::{ndarray as nd, IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, Py
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
-pub type Array2DOutput = PyResult<Py<PyArray2<f64>>>;
-pub type Array1DOutput = PyResult<Py<PyArray1<f64>>>;
+pub type Array2DOutput<T> = PyResult<Py<PyArray2<T>>>;
+pub type Array1DOutput<T> = PyResult<Py<PyArray1<T>>>;
 
 pub struct WindowConfig {
     pub length: usize,
     pub min_length: usize,
 }
-pub fn process_1d<F>(
+pub fn process_1d<F, T: nd::NdFloat + numpy::Element>(
     py: Python<'_>,
-    array: PyReadonlyArray1<'_, f64>,
+    array: PyReadonlyArray1<'_, T>,
     config: WindowConfig,
     process_fn: F,
-) -> Array1DOutput
+) -> Array1DOutput<T>
 where
-    F: FnOnce(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, &WindowConfig, usize)
-        + Send
-        + Sync,
+    F: FnOnce(&nd::ArrayView1<T>, &mut nd::ArrayViewMut1<T>, &WindowConfig, usize) + Send + Sync,
 {
     let array_view = array.as_array();
     let num_rows = array_view.len();
-    let mut output = nd::Array1::<f64>::from_elem(num_rows, f64::NAN);
+    let mut output = nd::Array1::<T>::from_elem(num_rows, T::nan());
     py.allow_threads(|| {
         process_fn(&array_view, &mut output.view_mut(), &config, num_rows);
     });
 
     Ok(output.into_pyarray(py).into())
 }
-pub fn process_2d<F>(
+pub fn process_2d<F, T: nd::NdFloat + numpy::Element>(
     py: Python<'_>,
-    array: PyReadonlyArray2<'_, f64>,
+    array: PyReadonlyArray2<'_, T>,
     config: WindowConfig,
     process_fn: F,
-) -> Array2DOutput
+) -> Array2DOutput<T>
 where
-    F: Fn(&nd::ArrayView1<f64>, &mut nd::ArrayViewMut1<f64>, &WindowConfig, usize) + Send + Sync,
+    F: Fn(&nd::ArrayView1<T>, &mut nd::ArrayViewMut1<T>, &WindowConfig, usize) + Send + Sync,
 {
     let array_view = array.as_array();
     let (num_rows, num_cols) = array_view.dim();
-    let mut output = nd::Array2::<f64>::from_elem((num_rows, num_cols), f64::NAN);
+    let mut output = nd::Array2::<T>::from_elem((num_rows, num_cols), T::nan());
 
     py.allow_threads(|| {
         array_view
