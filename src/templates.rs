@@ -122,36 +122,36 @@ pub fn move_valid_count<'py>(
         config,
         |input_col, output_col, config, num_rows| {
             let mut rank_count = ValidCounter::new();
-            for row in config.min_length.sub(1)..config.length {
+            (config.min_length.sub(1)..config.length).for_each(|row| {
                 rank_count.reset();
                 let current: f64 = input_col[row];
                 if current.is_nan() {
-                    continue;
+                    return;
                 }
 
-                for j in 0..row {
+                (0..row).for_each(|j| {
                     rank_count.add(input_col[j], current);
-                }
+                });
 
                 if rank_count.valid_count.ge(&config.min_length) {
                     output_col[row] = rank_count.get();
                 }
-            }
+            });
 
-            for row in config.length..num_rows {
+            (config.length..num_rows).for_each(|row| {
                 rank_count.reset();
                 let current: f64 = input_col[row];
                 if current.is_nan() {
-                    continue;
+                    return;
                 }
-                for j in row.sub(config.length).add(1)..row {
+                (row.sub(config.length).add(1)..row).for_each(|j| {
                     rank_count.add(input_col[j], current);
-                }
+                });
 
                 if rank_count.valid_count.ge(&config.min_length) {
                     output_col[row] = rank_count.get();
                 }
-            }
+            });
         },
     )
 }
