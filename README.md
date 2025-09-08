@@ -1,7 +1,7 @@
 # Rustats
 
-Rustats is a WIP Python library that re-implements functions available in polars, bottleneck, and numbagg. 
-Designed specifically for 2D numpy arrays holding floats, all the code implementation is done in Rust, allowing high performance, memory safety, and a code which is IMO much clearer than any C implementation. 
+Rustats is a WIP Python library that re-implements functions available in polars, bottleneck, and numbagg.
+Designed specifically for 2D numpy arrays holding floats, all the code implementation is done in Rust, allowing high performance, memory safety, and a code which is IMO much clearer than any C implementation.
 
 ## Performance
 
@@ -13,11 +13,13 @@ Designed specifically for 2D numpy arrays holding floats, all the code implement
 ## Usage example
 
 Most functions share this signature
+
 ````python
 def move_sum(
     array: NDArray[np.float64], length: int, min_length: int, parallel: bool
 ) -> NDArray[np.float64]: ...
 ````
+
 To use it simply do this:
 
 ````python
@@ -32,13 +34,12 @@ result = rs.move_sum(
     )
 ````
 
-To run it in parallel, simply provide True to the argument for a big performance boost. 
+To run it in parallel, simply provide True to the argument for a big performance boost.
 But if you have multiple threads already running (with concurrent futures for example), specifying False is recommended.
-
 
 ## Installation
 
-````
+````bash
 uv add git+https://github.com/OutSquareCapital/rustats.git
 ````
 
@@ -46,7 +47,7 @@ uv add git+https://github.com/OutSquareCapital/rustats.git
 
 Build with
 
-````
+````bash
 $env:CARGO_PROFILE_RELEASE_OPT_LEVEL="3"
 $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1"
 $env:CARGO_PROFILE_RELEASE_LTO = "fat"
@@ -60,13 +61,13 @@ Once the project is built and the pyproject version # is updated, commit the cha
 
 Then, update the version of the testing folder with
 
-````
+````bash
 rustats\tests> uv sync --upgrade
 ````
 
 Ensure you select the rigth .venv.
 
-````
+````bash
 & C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for compiling
 & C:/Users/tibo/python_codes/rustats/tests/.venv/Scripts/Activate.ps1 # for testing
 ````
@@ -80,7 +81,7 @@ Ensure you have 2 powershell terminals, one in rustats, the other in rustats\tes
 
 ![alt text](docs/terminals1.png)
 
-When testing, you'll be able to choose wether launching a global test, or a benchmark for a specific group. 
+When testing, you'll be able to choose wether launching a global test, or a benchmark for a specific group.
 
 You can specify a time duration target (for quick tests flexibility), wether it's a global or specific test.
 
@@ -90,7 +91,7 @@ Currently the distribution plots are filtered to exclude +95th percentile times.
 
 ### Example
 
-````
+````bash
 (tests) PS C:\Users\tibo\python_codes\rustats\tests> python main.py
 
 --- Menu ---
@@ -107,7 +108,6 @@ Timing median - rustats_parallel: 100%|█████████████�
 #### Output
 
 ##### Checking exactitude
-
 
 ##### Boxplot performance comparison
 
