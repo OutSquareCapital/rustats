@@ -12,14 +12,18 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "numpy>=1.24.4"
+    "numpy>=1.24.4",
 ]
 [tool.maturin]
 features = ["pyo3/extension-module"]
 profile = "release"
 
+[tool.uv.sources]
+bn-typed = { git = "https://github.com/OutSquareCapital/bottleneck-stubs.git" }
+
 [dependency-groups]
 dev = [
+    "bn-typed",
     "bottleneck>=1.5.0",
     "plotly>=6.3.0",
     "polars>=1.33.0",

@@ -135,14 +135,10 @@ pub struct IndexedProcessor<T: NdFloat> {
 }
 impl<T: NdFloat> IndexedProcessor<T> {
     pub fn new(capacity: usize, max_idx: usize) -> Self {
-        let small_heap = HeapIndexed::new(capacity, max_idx, true);
-        let large_heap = HeapIndexed::new(capacity, max_idx, false);
-        let deque = VecDeque::with_capacity(capacity.add(1));
-
         Self {
-            small_heap,
-            large_heap,
-            deque,
+            small_heap: HeapIndexed::new(capacity, max_idx, true),
+            large_heap: HeapIndexed::new(capacity, max_idx, false),
+            deque: VecDeque::with_capacity(capacity.add(1)),
         }
     }
     pub fn push_values(&mut self, current: T, row: usize) {

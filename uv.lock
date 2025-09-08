@@ -3,6 +3,14 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "bn-typed"
+version = "0.1.5"
+source = { git = "https://github.com/OutSquareCapital/bottleneck-stubs.git#f875c659deb45d6df2154934290d6c4f22e6437b" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[[package]]
 name = "bottleneck"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -151,6 +159,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "bn-typed" },
     { name = "bottleneck" },
     { name = "plotly" },
     { name = "polars" },
@@ -161,6 +170,7 @@ requires-dist = [{ name = "numpy", specifier = ">=1.24.4" }]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "bn-typed", git = "https://github.com/OutSquareCapital/bottleneck-stubs.git" },
     { name = "bottleneck", specifier = ">=1.5.0" },
     { name = "plotly", specifier = ">=6.3.0" },
     { name = "polars", specifier = ">=1.33.0" },

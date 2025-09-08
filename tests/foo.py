@@ -3,7 +3,8 @@ import polars as pl
 from collections.abc import Callable
 from pathlib import Path
 import numpy as np
-import bottleneck as bn  # type: ignore
+import bottleneck as bn
+from time import perf_counter
 
 
 def path_src():
@@ -22,18 +23,32 @@ def compute(expr: pl.Expr, func: Callable[[np.ndarray, int, int], np.ndarray]):
     )
 
 
-def test():
-    return (
-        pl.scan_parquet(path_src())  # type: ignore
-        .head(100)
-        .group_by("ticker")
-        .agg(
-            pl.col("close").pipe(compute, rs.move_mean).alias("rustats"),
-            pl.col("close").pipe(compute, bn.move_mean).alias("bottleneck"),  # type: ignore
-            pl.col("close").rolling_mean(3, min_samples=2).alias("polars"),
-        )
-    )
+def compare_speed():
+    arr1d = np.random.rand(1000).astype(np.float64)
+    arr2d = np.random.rand(1000, 1000).astype(np.float64)
+    iterations = 100
+    start = perf_counter()
+    for _ in range(iterations):
+        bn.move_median(arr1d, 300, 2, axis=0)
+    print("Bottleneck 1D:", _perf(start, iterations))
+
+    start = perf_counter()
+    for _ in range(iterations):
+        bn.move_median(arr2d, 300, 2, axis=0)
+    print("Bottleneck 2D:", _perf(start, iterations))
+    start = perf_counter()
+    for _ in range(iterations):
+        rs.move_median(arr1d, 300, 2)
+    print("Rustats 1D:", _perf(start, iterations))
+    start = perf_counter()
+    for _ in range(iterations):
+        rs.move_median(arr2d, 300, 2)
+    print("Rustats 2D:", _perf(start, iterations))
+
+
+def _perf(start: float, iterations: int):
+    return round(((perf_counter() - start) / iterations) * 1000, 6)
 
 
 if __name__ == "__main__":
-    print(test().collect())
+    compare_speed()
