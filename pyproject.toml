@@ -19,12 +19,11 @@ features = ["pyo3/extension-module"]
 profile = "release"
 
 [tool.uv.sources]
-bn-typed = { git = "https://github.com/OutSquareCapital/bottleneck-stubs.git" }
+bottleneck-stubs = { git = "https://github.com/py-stubs/bottleneck-stubs.git" }
 
 [dependency-groups]
 dev = [
-    "bn-typed",
     "bottleneck>=1.5.0",
-    "plotly>=6.3.0",
+    "bottleneck-stubs",
     "polars>=1.33.0",
 ]
